@@ -45,6 +45,24 @@ def init_db():
         joined_at TEXT NOT NULL
     )
     """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS favorites (
+        chat_id TEXT NOT NULL,
+        opp_id TEXT NOT NULL,
+        saved_at TEXT NOT NULL,
+        PRIMARY KEY (chat_id, opp_id)
+    )
+    """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS hunting_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp TEXT NOT NULL,
+        scanned_sources INTEGER NOT NULL,
+        new_found INTEGER NOT NULL,
+        updated_found INTEGER NOT NULL,
+        details TEXT
+    )
+    """)
     conn.commit()
     conn.close()
 
@@ -72,12 +90,6 @@ def generate_id(link: str, title: str = "") -> str:
     return hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
 
 def save_or_update_opportunity(data: Dict) -> Tuple[str, bool]:
-    """
-    حفظ أو تحديث فرصة:
-    ترجع (status, is_new):
-    - is_new: True إذا كانت فرصة جديدة تماماً
-    - status: 'NEW', 'UPDATED', 'EXISTING'
-    """
     conn = get_connection()
     cursor = conn.cursor()
     title = data.get("title", "بدون عنوان")
@@ -85,18 +97,20 @@ def save_or_update_opportunity(data: Dict) -> Tuple[str, bool]:
     opp_id = generate_id(link, title)
     now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
 
-    cursor.execute("SELECT id, deadline, status FROM opportunities WHERE id = ? OR link = ?", (opp_id, link))
+    cursor.execute("SELECT id, deadline, status FROM opportunities WHERE id = ?", (opp_id,))
     row = cursor.fetchone()
 
+    exp_req = data.get("experience_required", "0 سنوات (مفتوحة بالكامل لحديثي التخرج من الماستر / Early Stage Researcher)")
+    category = data.get("category", "RESERVOIR_STORAGE")
+
     if row is None:
-        # فرصة جديدة
         cursor.execute("""
         INSERT OR REPLACE INTO opportunities (
             id, title, link, institution, country, source_type, sub_specialty,
             deadline, tuition_fee, registration_fee, monthly_salary, is_funded,
             seats, acceptance_difficulty, status, first_seen_at, last_updated_at,
-            notified_as_new, notified_closing_soon
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NEW', ?, ?, 0, 0)
+            notified_as_new, notified_closing_soon, experience_required, category
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NEW', ?, ?, 0, 0, ?, ?)
         """, (
             opp_id,
             title,
@@ -113,13 +127,14 @@ def save_or_update_opportunity(data: Dict) -> Tuple[str, bool]:
             data.get("seats", "1 مقعد"),
             data.get("acceptance_difficulty", "متوسطة"),
             now_str,
-            now_str
+            now_str,
+            exp_req,
+            category
         ))
         conn.commit()
         conn.close()
         return "NEW", True
     else:
-        # فرصة موجودة مسبقاً، تحديث
         existing_id = row["id"]
         old_deadline = row["deadline"]
         new_deadline = data.get("deadline", old_deadline)
@@ -129,6 +144,7 @@ def save_or_update_opportunity(data: Dict) -> Tuple[str, bool]:
         cursor.execute("""
         UPDATE opportunities SET
             title = ?,
+            link = ?,
             deadline = ?,
             last_updated_at = ?,
             status = ?,
@@ -140,10 +156,13 @@ def save_or_update_opportunity(data: Dict) -> Tuple[str, bool]:
             monthly_salary = ?,
             is_funded = ?,
             seats = ?,
-            acceptance_difficulty = ?
+            acceptance_difficulty = ?,
+            experience_required = ?,
+            category = ?
         WHERE id = ?
         """, (
             title,
+            link,
             new_deadline,
             now_str,
             new_status,
@@ -156,21 +175,141 @@ def save_or_update_opportunity(data: Dict) -> Tuple[str, bool]:
             data.get("is_funded", "نعم"),
             data.get("seats", "1 مقعد"),
             data.get("acceptance_difficulty", "متوسطة"),
+            exp_req,
+            category,
             existing_id
         ))
         conn.commit()
         conn.close()
         return ("UPDATED" if is_updated else "EXISTING"), False
 
+def get_opportunity_by_id(opp_id: str) -> Optional[Dict]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM opportunities WHERE id = ?", (opp_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def get_all_active_open(source_filter: Optional[str] = None) -> List[Dict]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    query = "SELECT * FROM opportunities WHERE status != 'CLOSED'"
+    params = []
+    if source_filter:
+        query += " AND source_type = ?"
+        params.append(source_filter)
+    query += " ORDER BY deadline ASC"
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+def get_corporate_opportunities() -> List[Dict]:
+    return get_all_active_open(source_filter="COMPANY_INTERNAL")
+
+def get_internship_opportunities() -> List[Dict]:
+    return get_all_active_open(source_filter="INTERNSHIP_RD")
+
+def get_reservoir_storage_opportunities() -> List[Dict]:
+    all_opps = get_all_active_open()
+    keywords = ["reservoir", "storage", "ccus", "flow", "gas", "multiphase", "co2", "hydrogen", "مكامن", "كربون", "غاز"]
+    matched = [
+        o for o in all_opps
+        if any(k in o["sub_specialty"].lower() or k in o["title"].lower() for k in keywords)
+    ]
+    return matched
+
+def get_easy_opportunities() -> List[Dict]:
+    all_opps = get_all_active_open()
+    return [o for o in all_opps if "سهلة" in o.get("acceptance_difficulty", "") or "إيطاليا" in o.get("country", "")]
+
+def get_opportunities_by_country(country_name: str) -> List[Dict]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM opportunities WHERE country LIKE ? AND status != 'CLOSED' ORDER BY deadline ASC", (f"%{country_name}%",))
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+def search_opportunities(keyword: str) -> List[Dict]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    pattern = f"%{keyword.strip()}%"
+    cursor.execute("""
+    SELECT * FROM opportunities 
+    WHERE (title LIKE ? OR institution LIKE ? OR sub_specialty LIKE ? OR country LIKE ?)
+      AND status != 'CLOSED'
+    ORDER BY deadline ASC
+    """, (pattern, pattern, pattern, pattern))
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+# ----------------- المفضلة (Favorites) -----------------
+def add_favorite(chat_id: str, opp_id: str):
+    conn = get_connection()
+    cursor = conn.cursor()
+    now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute("INSERT OR REPLACE INTO favorites (chat_id, opp_id, saved_at) VALUES (?, ?, ?)", (str(chat_id), opp_id, now_str))
+    conn.commit()
+    conn.close()
+
+def remove_favorite(chat_id: str, opp_id: str):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM favorites WHERE chat_id = ? AND opp_id = ?", (str(chat_id), opp_id))
+    conn.commit()
+    conn.close()
+
+def is_favorite(chat_id: str, opp_id: str) -> bool:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT 1 FROM favorites WHERE chat_id = ? AND opp_id = ?", (str(chat_id), opp_id))
+    row = cursor.fetchone()
+    conn.close()
+    return row is not None
+
+def get_user_favorites(chat_id: str) -> List[Dict]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+    SELECT o.* FROM opportunities o
+    JOIN favorites f ON o.id = f.opp_id
+    WHERE f.chat_id = ?
+    ORDER BY f.saved_at DESC
+    """, (str(chat_id),))
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+# ----------------- سجل الصيد (Hunting Logs) -----------------
+def log_hunting_session(scanned: int, new_found: int, updated: int, details: str = ""):
+    conn = get_connection()
+    cursor = conn.cursor()
+    now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute("""
+    INSERT INTO hunting_logs (timestamp, scanned_sources, new_found, updated_found, details)
+    VALUES (?, ?, ?, ?, ?)
+    """, (now_str, scanned, new_found, updated, details))
+    conn.commit()
+    conn.close()
+
+def get_latest_hunting_stats() -> Optional[Dict]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM hunting_logs ORDER BY id DESC LIMIT 1")
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
 def get_new_opportunities_for_alert() -> List[Dict]:
-    """جلب الفرص الجديدة التي لم يتم إرسال تنبيه عنها بعد"""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM opportunities WHERE notified_as_new = 0")
     rows = cursor.fetchall()
-    result = [dict(r) for r in rows]
     conn.close()
-    return result
+    return [dict(r) for r in rows]
 
 def mark_as_notified_new(opp_ids: List[str]):
     if not opp_ids:
@@ -182,7 +321,6 @@ def mark_as_notified_new(opp_ids: List[str]):
     conn.close()
 
 def get_closing_soon_opportunities() -> List[Dict]:
-    """جلب الفرص التي ستغلق قريباً ولم يتم التنبيه عنها"""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -217,24 +355,3 @@ def mark_as_notified_closing(opp_ids: List[str]):
     cursor.executemany("UPDATE opportunities SET notified_closing_soon = 1, status = 'CLOSING_SOON' WHERE id = ?", [(i,) for i in opp_ids])
     conn.commit()
     conn.close()
-
-def get_all_active_open(source_filter: Optional[str] = None) -> List[Dict]:
-    conn = get_connection()
-    cursor = conn.cursor()
-    query = "SELECT * FROM opportunities WHERE status != 'CLOSED'"
-    params = []
-    if source_filter:
-        query += " AND source_type = ?"
-        params.append(source_filter)
-    query += " ORDER BY deadline ASC"
-    cursor.execute(query, params)
-    rows = cursor.fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
-
-def get_corporate_opportunities() -> List[Dict]:
-    return get_all_active_open(source_filter="COMPANY_INTERNAL")
-
-def get_internship_opportunities() -> List[Dict]:
-    return get_all_active_open(source_filter="INTERNSHIP_RD")
-

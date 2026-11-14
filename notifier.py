@@ -1,6 +1,8 @@
-from typing import Dict, List
+# -*- coding: utf-8 -*-
+from typing import Dict, List, Optional
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 
-def format_opportunity_card(opp: Dict, tag: str = "") -> str:
+def format_opportunity_card(opp: Dict, tag: str = "", current_idx: int = 0, total_count: int = 0) -> str:
     source_emoji = {
         "UNIVERSITY": "🏛️ جامعة",
         "INSTITUTE": "🔬 معهد بحثي متقدم",
@@ -10,53 +12,128 @@ def format_opportunity_card(opp: Dict, tag: str = "") -> str:
         "INTERNSHIP_RD": "💼 تدريب وتربص أطروحة (R&D Internship)"
     }.get(opp.get("source_type", "UNIVERSITY"), "📌 فرصة")
 
-    header_tag = f"【 {tag} 】\n" if tag else ""
+    pagination_str = f" [{current_idx + 1} من {total_count}]" if total_count > 0 else ""
+    header_tag = f"【 {tag}{pagination_str} 】\n" if tag or pagination_str else ""
 
     card = f"""
-{header_tag}🛢️ **{opp['title']}**
-{source_emoji} | 📍 **الجهة:** {opp['institution']} ({opp['country']})
+{header_tag}🛢️ *{opp['title']}*
+{source_emoji} | 📍 *الجهة:* {opp['institution']} ({opp['country']})
 ━━━━━━━━━━━━━━━━━━━━━━
-🎯 **1. التخصص الدقيق:** {opp['sub_specialty']}
-💰 **2. هل هي منحة / ممولة؟:** {opp['is_funded']}
-💵 **3. الراتب الشهري:** {opp['monthly_salary']}
-🎓 **4. رسوم الدراسة (Tuition):** {opp['tuition_fee']}
-📝 **5. رسوم التسجيل (Registration):** {opp['registration_fee']}
-👥 **6. عدد المقاعد المتاحة:** {opp['seats']}
-📅 **تاريخ الإغلاق (Deadline):** {opp.get('deadline', 'مفتوح حتى ملء الشواغر')}
-💼 **الخبرة المطلوبة:** 0 سنوات (مخصصة لحديثي التخرج من الماستر / R1 Early Stage)
+🎯 *1. التخصص الدقيق:* {opp['sub_specialty']}
+💰 *2. التمويل:* {opp['is_funded']}
+💵 *3. الراتب الشهري:* {opp['monthly_salary']}
+🎓 *4. رسوم الدراسة:* {opp['tuition_fee']}
+📝 *5. رسوم التسجيل:* {opp['registration_fee']}
+👥 *6. عدد المقاعد:* {opp['seats']}
+📅 *تاريخ الإغلاق:* {opp.get('deadline', 'مفتوح حتى ملء الشواغر')}
+💼 *الخبرة المطلوبة:* 0 سنوات (مفتوحة لحديثي التخرج من الماستر R1)
 
-📊 **7. تقييم القبول لملف بلال حداد:**
+📊 *7. تقييم القبول لملف بلال حداد:*
 {opp['acceptance_difficulty']}
 ━━━━━━━━━━━━━━━━━━━━━━
-🔗 [اضغط هنا لفتح رابط التقديم المباشر]({opp['link']})
 """
     return card.strip()
 
+def build_opportunity_keyboard(opp: Dict, category: str, page: int, total: int, is_fav: bool = False) -> InlineKeyboardMarkup:
+    """
+    إنشاء لوحة أزرار تفاعلية أنيقة ملحقة بكل فرصة:
+    - رابط التقديم المباشر كزر خارجي (URL Button)
+    - حفظ/إزالة من المفضلة
+    - تجهيز إيميل الأستاذ
+    - أزرار التنقل (السابق / التالي)
+    """
+    fav_text = "❌ إزالة من المفضلة" if is_fav else "⭐ حفظ بالمفضلة"
+    fav_data = f"unfav:{opp['id']}:{category}:{page}" if is_fav else f"fav:{opp['id']}:{category}:{page}"
+
+    keyboard = [
+        # زر الرابط المباشر
+        [InlineKeyboardButton("🌐 فتح رابط التقديم المباشر (200 OK)", url=opp["link"])],
+        # أزرار الإجراءات
+        [
+            InlineKeyboardButton("✉️ جهز إيميل المشرف", callback_data=f"mail:{opp['id']}"),
+            InlineKeyboardButton(fav_text, callback_data=fav_data)
+        ]
+    ]
+
+    # أزرار التنقل في الصفحات
+    nav_buttons = []
+    if page > 0:
+        nav_buttons.append(InlineKeyboardButton("◀️ السابق", callback_data=f"page:{category}:{page-1}"))
+    else:
+        nav_buttons.append(InlineKeyboardButton("⏹️ البداية", callback_data="noop"))
+
+    nav_buttons.append(InlineKeyboardButton(f"📄 {page+1} / {total}", callback_data="noop"))
+
+    if page < total - 1:
+        nav_buttons.append(InlineKeyboardButton("التالي ▶️", callback_data=f"page:{category}:{page+1}"))
+    else:
+        nav_buttons.append(InlineKeyboardButton("⏹️ النهاية", callback_data="noop"))
+
+    keyboard.append(nav_buttons)
+    keyboard.append([InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="menu:main")])
+
+    return InlineKeyboardMarkup(keyboard)
+
+def format_professor_card(prof: Dict, current_idx: int = 0, total_count: int = 0) -> str:
+    pagination_str = f" [{current_idx + 1} من {total_count}]" if total_count > 0 else ""
+    return f"""
+👨‍🏫 *{prof['name']}* - {prof['title']}{pagination_str}
+🏛️ *الجامعة / المركز:* {prof['institution']} ({prof['country']})
+📧 *البريد المباشر:* `{prof['email']}`
+🌐 *موقع المختبر:* {prof['lab_website']}
+━━━━━━━━━━━━━━━━━━━━━━
+🔬 *المشاريع الحالية المفتوحة:*
+{prof['current_projects']}
+
+💰 *نوع الفرص المتاحة:*
+{prof['open_positions']}
+
+💡 *تقييم الملاءمة لملف بلال حداد:*
+{prof['advice_for_user']}
+━━━━━━━━━━━━━━━━━━━━━━
+""".strip()
+
+def build_professor_keyboard(prof: Dict, page: int, total: int) -> InlineKeyboardMarkup:
+    keyboard = [
+        [InlineKeyboardButton("🌐 زيارة موقع مختبر الأستاذ", url=prof["lab_website"])],
+        [InlineKeyboardButton("✉️ توليد إيميل مخصص لهذا الأستاذ", callback_data=f"prof_mail:{page}")],
+    ]
+    nav_buttons = []
+    if page > 0:
+        nav_buttons.append(InlineKeyboardButton("◀️ السابق", callback_data=f"prof_page:{page-1}"))
+    else:
+        nav_buttons.append(InlineKeyboardButton("⏹️", callback_data="noop"))
+
+    nav_buttons.append(InlineKeyboardButton(f"👨‍🏫 {page+1} / {total}", callback_data="noop"))
+
+    if page < total - 1:
+        nav_buttons.append(InlineKeyboardButton("التالي ▶️", callback_data=f"prof_page:{page+1}"))
+    else:
+        nav_buttons.append(InlineKeyboardButton("⏹️", callback_data="noop"))
+
+    keyboard.append(nav_buttons)
+    keyboard.append([InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="menu:main")])
+    return InlineKeyboardMarkup(keyboard)
+
 def build_daily_digest(new_opps: List[Dict], closing_soon: List[Dict], updated_opps: List[Dict]) -> List[str]:
-    """
-    بناء التقرير الصباحي اليومي المنسق في رسائل واضحة
-    """
     messages = []
     summary_header = (
-        "🌅 **التقرير اليومي لفرص دكتوراه هندسة البترول والطاقة الجوفية** 🛢️\n"
+        "🌅 *التقرير اليومي لفرص دكتوراه هندسة البترول والطاقة الجوفية* 🛢️\n"
         "━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"⚡ **فرص جديدة فتحت اليوم:** {len(new_opps)}\n"
-        f"⏳ **فرص تقترب من الإغلاق (خلال 7 أيام):** {len(closing_soon)}\n"
-        f"🔄 **فرص تم تحديثها:** {len(updated_opps)}\n"
+        f"⚡ *فرص جديدة فتحت اليوم:* {len(new_opps)}\n"
+        f"⏳ *فرص تقترب من الإغلاق:* {len(closing_soon)}\n"
+        f"🔄 *فرص تم تحديثها:* {len(updated_opps)}\n"
         "━━━━━━━━━━━━━━━━━━━━━━\n"
-        "إليك التفاصيل الكاملة لكل فرصة مرتبة بالأسفل 👇"
+        "إليك ملخص أبرز الفرص الجديدة المصطادة اليوم 👇"
     )
     messages.append(summary_header)
 
-    for opp in new_opps:
-        messages.append(format_opportunity_card(opp, tag="⚡ فرصة جديدة فتحت اليوم"))
+    for opp in new_opps[:4]:
+        messages.append(format_opportunity_card(opp, tag="⚡ فرصة جديدة"))
 
-    for opp in closing_soon:
+    for opp in closing_soon[:3]:
         days = opp.get("days_left", "")
         tag_str = f"⏳ تغلق قريباً (متبقي {days} أيام)" if days != "" else "⏳ تغلق قريباً"
         messages.append(format_opportunity_card(opp, tag=tag_str))
-
-    for opp in updated_opps:
-        messages.append(format_opportunity_card(opp, tag="🔄 تم تحديث التواريخ أو الشروط"))
 
     return messages

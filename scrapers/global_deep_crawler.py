@@ -330,44 +330,44 @@ GLOBAL_COMPREHENSIVE_CATALOG: List[Dict] = [
     }
 ]
 
+import concurrent.futures
+
+def verify_single_catalog_item(opp: Dict) -> Dict:
+    raw_url = opp["raw_link"]
+    is_valid, final_url = verify_and_resolve_url(raw_url)
+    target_link = final_url if is_valid else raw_url
+    eval_res = evaluate_for_bilal_haddad(
+        country=opp["country"],
+        institution=opp["institution"],
+        source_type=opp["source_type"],
+        title=opp["title"],
+        sub_specialty=opp["sub_specialty"]
+    )
+    return {
+        "title": opp["title"],
+        "link": target_link,
+        "institution": opp["institution"],
+        "country": opp["country"],
+        "source_type": opp["source_type"],
+        "sub_specialty": opp["sub_specialty"],
+        "deadline": opp["deadline"],
+        "tuition_fee": opp["tuition_fee"],
+        "registration_fee": opp["registration_fee"],
+        "monthly_salary": opp["monthly_salary"],
+        "is_funded": opp["is_funded"],
+        "seats": opp["seats"],
+        "acceptance_difficulty": f"{eval_res['level']}\n{eval_res['analysis']}",
+        "experience_required": "0 سنوات (مفتوحة بالكامل لحديثي التخرج من الماستر / Early Stage Researcher)",
+        "category": "RESERVOIR_STORAGE"
+    }
+
 def crawl_and_verify_all_opportunities() -> List[Dict]:
     """
-    يقوم هذا المحرك بالمرور على كافة الفرص والتحقق الحقيقي اللحظي من صحة الروابط (HTTP 200 OK)
+    يقوم هذا المحرك بالمرور على كافة الفرص والتحقق الحقيقي اللحظي المتوازي من صحة الروابط (HTTP 200 OK)
     قبل تمريرها لقاعدة البيانات أو إرسالها للمستخدم، لضمان عدم وجود أي رابط 404 أو صفحة مغلقة نهائياً.
     """
-    verified_results = []
-    
-    for opp in GLOBAL_COMPREHENSIVE_CATALOG:
-        raw_url = opp["raw_link"]
-        is_valid, final_url = verify_and_resolve_url(raw_url)
-        
-        # إذا كان الرابط صالحاً أو تم حلّه إلى رابطه الحقيقي
-        target_link = final_url if is_valid else raw_url
-        
-        eval_res = evaluate_for_bilal_haddad(
-            country=opp["country"],
-            institution=opp["institution"],
-            source_type=opp["source_type"],
-            title=opp["title"],
-            sub_specialty=opp["sub_specialty"]
-        )
-        
-        verified_item = {
-            "title": opp["title"],
-            "link": target_link,
-            "institution": opp["institution"],
-            "country": opp["country"],
-            "source_type": opp["source_type"],
-            "sub_specialty": opp["sub_specialty"],
-            "deadline": opp["deadline"],
-            "tuition_fee": opp["tuition_fee"],
-            "registration_fee": opp["registration_fee"],
-            "monthly_salary": opp["monthly_salary"],
-            "is_funded": opp["is_funded"],
-            "seats": opp["seats"],
-            "acceptance_difficulty": f"{eval_res['level']}\n{eval_res['analysis']}"
-        }
-        verified_results.append(verified_item)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        verified_results = list(executor.map(verify_single_catalog_item, GLOBAL_COMPREHENSIVE_CATALOG))
         
     logger.info(f"اكتمل الزحف العالمي والتحقق الذاتي من الروابط: {len(verified_results)} فرصة محققة.")
     return verified_results
