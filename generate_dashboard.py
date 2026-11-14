@@ -13,9 +13,44 @@ cursor = conn.cursor()
 cursor.execute("SELECT * FROM opportunities ORDER BY deadline ASC")
 rows = cursor.fetchall()
 opps = [dict(r) for r in rows]
+
+cursor.execute("""
+SELECT p1.* FROM portal_audit_logs p1
+JOIN (
+    SELECT portal_name, MAX(id) as max_id
+    FROM portal_audit_logs
+    GROUP BY portal_name
+) p2 ON p1.id = p2.max_id
+ORDER BY p1.http_status DESC, p1.response_time_ms ASC
+""")
+portal_audits = [dict(r) for r in cursor.fetchall()]
+
+cursor.execute("SELECT * FROM hunting_logs ORDER BY id DESC LIMIT 1")
+last_hunt_row = cursor.fetchone()
+last_hunt = dict(last_hunt_row) if last_hunt_row else {}
 conn.close()
 
 today = date(2026, 11, 14) # Local current date
+
+online_portals_count = sum(1 for p in portal_audits if p["http_status"] == 200)
+total_links_scanned = sum(p["links_scanned"] for p in portal_audits)
+total_petro_matches = sum(p["petro_matches"] for p in portal_audits)
+avg_portal_latency = round(sum(p["response_time_ms"] for p in portal_audits) / max(1, len(portal_audits)))
+latest_hunt_time = last_hunt.get("timestamp", "اليوم")
+
+portal_rows_html = ""
+for p in portal_audits:
+    status_badge = f'<span style="background: rgba(34, 197, 94, 0.2); color: #4ade80; padding: 2px 8px; border-radius: 4px; font-weight: 700;">🟢 {p["http_status"]} OK</span>' if p["http_status"] == 200 else f'<span style="background: rgba(239, 68, 68, 0.2); color: #f87171; padding: 2px 8px; border-radius: 4px; font-weight: 700;">🔴 فشل</span>'
+    portal_rows_html += f"""
+    <tr style="border-bottom: 1px solid #334155;">
+        <td style="padding: 10px 12px; font-weight: 600; color: #f8fafc;">{p["portal_name"]}</td>
+        <td style="padding: 10px 12px;">{status_badge}</td>
+        <td style="padding: 10px 12px; color: #38bdf8; font-weight: 600;">{p["response_time_ms"]} ms</td>
+        <td style="padding: 10px 12px; color: #94a3b8;">{p["links_scanned"]} رابط</td>
+        <td style="padding: 10px 12px; color: #f59e0b; font-weight: 700;">{p["petro_matches"]}</td>
+        <td style="padding: 10px 12px;"><a href="{p['portal_url']}" target="_blank" style="color: #60a5fa; text-decoration: underline; font-size: 0.78rem;">فتح البوابة ↗</a></td>
+    </tr>
+    """
 
 for o in opps:
     dl = o.get("deadline", "")
@@ -128,10 +163,64 @@ html_content = f"""<!DOCTYPE html>
 <body>
     <div class="container">
         <header>
-            <h1>🛢️ رادار فرص دكتوراه هندسة البترول والطاقة الجوفية</h1>
-            <p>متابعة آنية ومحدثة للفرص المفتوحة، مواعيد الإغلاق، ومصادر التمويل الحكومية ومشاريع المخابر</p>
-            <div class="badge-student">🎯 مخصص لك: طالب جزائري يدرس ماستر في إيطاليا (أفضلية في نظام ECTS ومشاريع PNRR/ENI)</div>
+            <h1>🛢️ رادار فرص دكتوراه وتدريب هندسة البترول والطاقة الجوفية</h1>
+            <p>متابعة آنية ومحدثة للفرص المفتوحة، مواعيد الإغلاق، ومصادر التمويل الحكومية ومشاريع المخابر والشركات المستقلة</p>
+            <div class="badge-student">🎯 مخصص للمهندس بلال حداد: ماستر غوبكين موسكو (4.6/5.0) + ماستر كاتانيا + خبرة سوناطراك وإيني</div>
         </header>
+
+        <!-- Live Deep Web Crawler Telemetry -->
+        <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%); border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 14px; padding: 18px 22px; margin-bottom: 24px; box-shadow: 0 8px 20px rgba(0,0,0,0.35);">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 14px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 12px #22c55e;"></span>
+                    <h2 style="font-size: 1.15rem; color: #38bdf8; font-weight: 700;">📡 رادار الصيد والزحف الحي المباشر (24/7 Autonomous Deep Hunter Telemetry)</h2>
+                </div>
+                <div style="font-size: 0.82rem; color: #94a3b8; background: rgba(51, 65, 85, 0.6); padding: 4px 12px; border-radius: 20px;">
+                    ⏱️ آخر فحص متوازي حي: <strong style="color: #f8fafc;">{latest_hunt_time}</strong>
+                </div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 14px;">
+                <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border); border-radius: 8px; padding: 12px; text-align: center;">
+                    <div style="font-size: 1.45rem; font-weight: 800; color: #22c55e;">{online_portals_count} / {len(portal_audits)}</div>
+                    <div style="font-size: 0.8rem; color: #94a3b8;">بوابات حية مفحوصة ومحللة كلياً</div>
+                </div>
+                <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border); border-radius: 8px; padding: 12px; text-align: center;">
+                    <div style="font-size: 1.45rem; font-weight: 800; color: #38bdf8;">{total_links_scanned:,}</div>
+                    <div style="font-size: 0.8rem; color: #94a3b8;">رابط تم تنزيل وتحليل كود HTML الخاص به</div>
+                </div>
+                <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border); border-radius: 8px; padding: 12px; text-align: center;">
+                    <div style="font-size: 1.45rem; font-weight: 800; color: #f59e0b;">{total_petro_matches}</div>
+                    <div style="font-size: 0.8rem; color: #94a3b8;">مطابقة تخصصية (مكامن / غاز / CCUS / H2)</div>
+                </div>
+                <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--border); border-radius: 8px; padding: 12px; text-align: center;">
+                    <div style="font-size: 1.45rem; font-weight: 800; color: #a855f7;">{avg_portal_latency} ms</div>
+                    <div style="font-size: 0.8rem; color: #94a3b8;">متوسط سرعة استجابة الخوادم الدولية</div>
+                </div>
+            </div>
+
+            <!-- تفاصيل تدقيق البوابات -->
+            <details style="margin-top: 10px; cursor: pointer;">
+                <summary style="color: #38bdf8; font-weight: 600; font-size: 0.9rem; user-select: none;">🔍 استعراض سجل الفحص المباشر للبوابات الـ 29 (انقر للإظهار / الإخفاء)</summary>
+                <div style="margin-top: 14px; overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem; text-align: right;">
+                        <thead>
+                            <tr style="background: rgba(51, 65, 85, 0.5); color: #cbd5e1; border-bottom: 1px solid var(--border);">
+                                <th style="padding: 8px 12px;">البوابة والمؤسسة</th>
+                                <th style="padding: 8px 12px;">الحالة</th>
+                                <th style="padding: 8px 12px;">زمن الاستجابة</th>
+                                <th style="padding: 8px 12px;">الروابط المحللة</th>
+                                <th style="padding: 8px 12px;">مطابقات التخصص</th>
+                                <th style="padding: 8px 12px;">الرابط المفحوص</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {portal_rows_html}
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        </div>
 
         <div class="stats-bar">
             <div class="stat-card">

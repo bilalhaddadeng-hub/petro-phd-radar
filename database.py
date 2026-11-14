@@ -82,6 +82,20 @@ def init_db():
         authorized_at TEXT
     )
     """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS portal_audit_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        portal_name TEXT,
+        portal_url TEXT,
+        http_status INTEGER,
+        response_time_ms INTEGER,
+        links_scanned INTEGER,
+        petro_matches INTEGER,
+        status_text TEXT,
+        sample_matches_json TEXT,
+        scanned_at TEXT
+    )
+    """)
     conn.commit()
     conn.close()
 
@@ -367,6 +381,33 @@ def log_hunting_session(scanned: int, new_found: int, updated: int, details: str
     """, (now_str, scanned, new_found, updated, details))
     conn.commit()
     conn.close()
+
+def save_portal_audit_log(portal_name: str, portal_url: str, http_status: int, response_time_ms: int, links_scanned: int, petro_matches: int, status_text: str, sample_matches_json: str = "[]"):
+    conn = get_connection()
+    cursor = conn.cursor()
+    now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute("""
+    INSERT INTO portal_audit_logs (portal_name, portal_url, http_status, response_time_ms, links_scanned, petro_matches, status_text, sample_matches_json, scanned_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (portal_name, portal_url, http_status, response_time_ms, links_scanned, petro_matches, status_text, sample_matches_json, now_str))
+    conn.commit()
+    conn.close()
+
+def get_latest_portal_audits() -> List[Dict]:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+    SELECT p1.* FROM portal_audit_logs p1
+    JOIN (
+        SELECT portal_name, MAX(id) as max_id
+        FROM portal_audit_logs
+        GROUP BY portal_name
+    ) p2 ON p1.id = p2.max_id
+    ORDER BY p1.http_status DESC, p1.response_time_ms ASC
+    """)
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
 
 def get_latest_hunting_stats() -> Optional[Dict]:
     conn = get_connection()
