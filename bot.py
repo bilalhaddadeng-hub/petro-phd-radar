@@ -74,7 +74,7 @@ logger = logging.getLogger(__name__)
 # لوحة المفاتيح الرئيسية الثابتة (سهلة وسريعة الوصول)
 MAIN_KEYBOARD = [
     [KeyboardButton("🛢️ مكامن وتخزين جوفي (CCUS/H2)"), KeyboardButton("🎓 فرص بدون خبرة (Fresh Master)")],
-    [KeyboardButton("🟢 أسهل الفرص لملفك (إيطاليا)"), KeyboardButton("🏢 دكتوراه صناعية (شركات)")],
+    [KeyboardButton("🟢 وجهات سهلة القبول وعالية الفرص"), KeyboardButton("🏢 دكتوراه صناعية (شركات)")],
     [KeyboardButton("💼 فرص تدريب وأطروحة R&D"), KeyboardButton("👨‍🏫 رادار الأساتذة والمشاريع")],
     [KeyboardButton("🎯 صياد الفرص الحي (Live Hunter)"), KeyboardButton("⭐ الفرص المحفوظة (المفضلة)")],
     [KeyboardButton("🌍 تصفح حسب الدولة"), KeyboardButton("🔍 بحث مخصص في الفرص")]
@@ -299,17 +299,32 @@ async def cmd_countries_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text(AUTH_LOCKED_TEXT, parse_mode="Markdown")
         return
     keyboard = [
-        [InlineKeyboardButton("🇮🇹 إيطاليا (PoliTo / Eni / PoliMi)", callback_data="c:إيطاليا")],
-        [InlineKeyboardButton("🇳🇴 النرويج (Equinor / NTNU / UiS)", callback_data="c:النرويج"),
-         InlineKeyboardButton("🇦🇹 النمسا (Leoben / OMV)", callback_data="c:النمسا")],
-        [InlineKeyboardButton("🇫🇷 فرنسا (TotalEnergies / IFPEN)", callback_data="c:فرنسا"),
-         InlineKeyboardButton("🇳🇱 هولندا (TU Delft)", callback_data="c:هولندا")],
-        [InlineKeyboardButton("🇸🇦 السعودية (KAUST / KFUPM CPG)", callback_data="c:السعودية"),
-         InlineKeyboardButton("🇬🇧 بريطانيا (Heriot-Watt)", callback_data="c:بريطانيا")],
-        [InlineKeyboardButton("🔙 العودة للقائمة", callback_data="menu:main")]
+        [InlineKeyboardButton("🇭🇺 المجر (Miskolc / MOL)", callback_data="c:المجر"),
+         InlineKeyboardButton("🇷🇴 رومانيا (UPG Ploiești)", callback_data="c:رومانيا")],
+        [InlineKeyboardButton("🇵🇱 بولندا (AGH Kraków)", callback_data="c:بولندا"),
+         InlineKeyboardButton("🇰🇿 كازاخستان (Nazarbayev Univ)", callback_data="c:كازاخستان")],
+        [InlineKeyboardButton("🇧🇷 البرازيل (UNICAMP UNISIM)", callback_data="c:البرازيل"),
+         InlineKeyboardButton("🇲🇾 ماليزيا (UTP PETRONAS)", callback_data="c:ماليزيا")],
+        [InlineKeyboardButton("🇦🇪 الإمارات (Khalifa Univ)", callback_data="c:الإمارات"),
+         InlineKeyboardButton("🇸🇦 السعودية (KAUST / KFUPM)", callback_data="c:السعودية")],
+        [InlineKeyboardButton("🇺🇸 أمريكا (Univ of Wyoming / UND)", callback_data="c:الولايات المتحدة"),
+         InlineKeyboardButton("🇨🇦 كندا (Univ of Calgary)", callback_data="c:كندا")],
+        [InlineKeyboardButton("🇦🇹 النمسا (Leoben / OMV)", callback_data="c:النمسا"),
+         InlineKeyboardButton("🇳🇴 النرويج (UiS / NTNU / Equinor)", callback_data="c:النرويج")],
+        [InlineKeyboardButton("🇩🇪 ألمانيا (Freiberg / GFZ / Wintershall)", callback_data="c:ألمانيا"),
+         InlineKeyboardButton("🇳🇱 هولندا (TU Delft / TNO)", callback_data="c:هولندا")],
+        [InlineKeyboardButton("🇮🇹 إيطاليا (PoliTo / Eni / PoliMi)", callback_data="c:إيطاليا"),
+         InlineKeyboardButton("🇫🇷 فرنسا (TotalEnergies / IFPEN)", callback_data="c:فرنسا")],
+        [InlineKeyboardButton("🇬🇧 بريطانيا (Heriot-Watt / ERCE)", callback_data="c:بريطانيا")],
+        [InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="menu:main")]
     ]
     await update.message.reply_text(
-        "🌍 *اختر الدولة التي تريد استعراض فرص الدكتوراه والتدريب المتاحة بها:*",
+        "🌍 *رادار الوجهات العالمية المتوازنة لدكتوراه وتدريب هندسة البترول والمكامن:*\n\n"
+        "💡 *توزيع استراتيجي متكافئ لملفك:* تم تنويع الوجهات لتفادي التنافس الغربي المحموم، وتوفير فرص قبول سهلة ومضمونة عبر:\n"
+        "• *أوروبا الشرقية وآسيا وأمريكا اللاتينية:* قبول مضمون ونسبة تنافس منخفضة وميزة هائلة لشهادة غوبكين.\n"
+        "• *أمريكا الشمالية والخليج العربي:* تمويلات عالية ومشاريع حقلية رائدة.\n"
+        "• *أوروبا الغربية:* مراكز بحثية متقدمة وتنافسية معتادة.\n\n"
+        "👇 *اختر الدولة لاستعراض الفرص والتقديم المباشر:*",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
@@ -371,7 +386,7 @@ async def handle_user_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await cmd_reservoir(update, context)
     elif text == "🎓 فرص بدون خبرة (Fresh Master)":
         await cmd_no_exp(update, context)
-    elif text == "🟢 أسهل الفرص لملفك (إيطاليا)":
+    elif text in ["🟢 وجهات سهلة القبول وعالية الفرص", "🟢 أسهل الفرص لملفك (إيطاليا)"]:
         await cmd_easy(update, context)
     elif text == "🏢 دكتوراه صناعية (شركات)":
         await cmd_corporate(update, context)

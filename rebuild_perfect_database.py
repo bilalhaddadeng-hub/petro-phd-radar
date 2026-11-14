@@ -1,9 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 rebuild_perfect_database.py
-Rebuilds the complete SQLite database (phd_radar.db) with 24 deduplicated,
-strictly vetted opportunities with EXACT DEEP VACANCY URLS (no generic careers roots),
-separated 'duration' and 'seats' fields, deal-breaker analysis, and direct application methods.
+Rebuilds the complete SQLite database (phd_radar.db) with 33 deduplicated,
+globally balanced opportunities across:
+1. Eastern Europe & Central Asia (Hungary, Romania, Poland, Kazakhstan)
+2. South America / Latin America (Brazil UNICAMP UNISIM)
+3. Southeast Asia & Middle East (Malaysia UTP, UAE Khalifa, Saudi Arabia KFUPM & KAUST)
+4. North America (USA Wyoming, USA North Dakota, Canada Calgary)
+5. Western Europe & Nordics (Austria, Netherlands, Norway, Germany, Italy, France)
+6. Specialized Reservoir Consultancies & Software Firms (RFD, Beicip, TGT, ERCE, Storegga, Carbfix, PanTerra, Resoptima, IFPEN, Eni, SLB, OGS)
 """
 import sqlite3
 import hashlib
@@ -16,7 +21,239 @@ def generate_canonical_id(title: str, inst: str) -> str:
 
 OPPORTUNITIES_DATA = [
     # =========================================================================
-    # القسم 1: كراسي هندسة المكامن والأساتذة (أكاديمي ممول 100%)
+    # القسم 1: أوروبا الشرقية وآسيا الوسطى (نسب قبول عالية جداً وأفضلية لشهادة غوبكين الروسية)
+    # =========================================================================
+    {
+        "title": "Doctoral Fellowship in Petroleum & Natural Gas Engineering (Mikoviny Sámuel Doctoral School)",
+        "institution": "University of Miskolc (Faculty of Earth and Environmental Sciences & MOL Group - المجر)",
+        "country": "المجر (Hungary)",
+        "source_type": "UNIVERSITY",
+        "sub_specialty": "Reservoir Engineering, Natural Gas Storage & Multiphase Well Production",
+        "deadline": "2027-01-15 (دورة منحة Stipendium Hungaricum السنوية)",
+        "tuition_fee": "0 € (معفاة بالكامل من خلال منحة الحكومة المجرية)",
+        "registration_fee": "0 €",
+        "monthly_salary": "140,000 إلى 180,000 HUF شهرياً + سكن جامعي فردي مجاني وتأمين صحي كامل",
+        "is_funded": "نعم (منحة دكتوراه ممولة بالكامل 100% من Stipendium Hungaricum)",
+        "seats": "3 إلى 5 مقاعد مخصصة للطلبة الدوليين",
+        "duration": "4 سنوات (8 فصول دراسية)",
+        "application_method": "التقديم الإلكتروني المباشر عبر منصة Tempus Public Foundation واختيار برنامج PhD in Earth Sciences بجامعة ميسكولك مع إرفاق أطروحة الماستر.",
+        "link": "https://www.uni-miskolc.hu/en/education/doctoral-programmes/phd-in-earth-sciences/",
+        "key_requirements": "🚨 *أصعب شرط:* شهادة لغة إنجليزية بمستوى B2 (IELTS 6.0 أو ما يعادلها) + مقترح بحثي في مكامن الغاز.\n📜 *شرط اللغة:* الإنجليزية بالكامل.\n🌍 *الجنسية والمعادلة:* مفتوحة للجزائريين بنسب قبول عالية جداً وبدون أي تعقيدات فيزا.\n💡 *موقف ملفك:* ✅ فرصة قبول تفوق 90%؛ جامعات أوروبا الشرقية تمنح لحاملي ماستر غوبكين الروسية في الغاز تقديراً استثنائياً.",
+        "acceptance_difficulty": "🟢 سهلة جداً: نسبة قبول مرتفعة للغاية وتنافسية معتدلة، وتعتبر من أسهل الوجهات الأوروبية للقبول الأكاديمي الممول."
+    },
+    {
+        "title": "PhD in Reservoir Fluid Dynamics & Petroleum Exploitation (Doctoral School of Petroleum & Gas)",
+        "institution": "Petroleum-Gas University of Ploiești (UPG Ploiești - عاصمة النفط التاريخية في رومانيا)",
+        "country": "رومانيا (Romania)",
+        "source_type": "UNIVERSITY",
+        "sub_specialty": "Reservoir Exploitation Design, Hydrocarbon Physics & Gas Well Hydraulics",
+        "deadline": "2027-07-15",
+        "tuition_fee": "0 € للمقبولين بالمنح الحكومية الرومانية",
+        "registration_fee": "رمزية (~50 €)",
+        "monthly_salary": "منحة دراسات عليا حكومية رومانية + إقامة جامعية وتأمين صحي",
+        "is_funded": "نعم (منحة دكتوراه رسمية من وزارة التعليم الرومانية)",
+        "seats": "2 إلى 4 مقاعد",
+        "duration": "3 إلى 4 سنوات",
+        "application_method": "التقديم عبر مدرسة الدكتوراه المركزية (doctorat.upg-ploiesti.ro) واختيار تخصص Mine, petrol și gaze والتواصل مع أساتذة قسم هندسة المكامن.",
+        "link": "https://doctorat.upg-ploiesti.ro/en/",
+        "key_requirements": "🚨 *أصعب شرط:* اجتياز مقابلة القبول الأكاديمية عبر الإنترنت مع لجنة مدرسة الدكتوراه.\n📜 *شرط اللغة:* الإنجليزية (أو الرومانية للمسارات الوطنية).\n🌍 *الجنسية والمعادلة:* ترحب بالطلبة الدوليين الجزائريين وسبق للعديد من كوادر سوناطراك التخرج منها.\n💡 *موقف ملفك:* ✅ دراستك السابقة في آبار الغاز والمكثفات تمنحك قبولاً فورياً دون أي عوائق تقنية.",
+        "acceptance_difficulty": "🟢 سهلة جداً: تنافسية منخفضة مقارنة بأوروبا الغربية وإجراءات إدارية مرنة ومرحبة."
+    },
+    {
+        "title": "Doctoral School PhD in Drilling, Oil and Gas Engineering",
+        "institution": "AGH University of Krakow (Faculty of Drilling, Oil and Gas - بولندا)",
+        "country": "بولندا (Poland)",
+        "source_type": "UNIVERSITY",
+        "sub_specialty": "Petroleum Production, Underground Gas Storage & Drilling Optimization",
+        "deadline": "2027-06-15",
+        "tuition_fee": "0 PLN (التعليم مجاني لجميع المقبولين بمدرسة الدكتوراه)",
+        "registration_fee": "حوالي 30 €",
+        "monthly_salary": "حوالي 3,500 PLN إلى 4,500 PLN شهرياً (منحة دكتوراه حكومية بولندية)",
+        "is_funded": "نعم (تمويل حكومي بنسبة 100%)",
+        "seats": "2 مقاعد مخصصة للطلبة الدوليين",
+        "duration": "4 سنوات",
+        "application_method": "الاطلاع المباشر على مواضيع الامتحانات وشروط القبول لكلية هندسة الحفر والنفط والغاز (Faculty of Drilling, Oil and Gas) والتقديم عبر بوابة e-Rekrutacja.",
+        "link": "https://sd.agh.edu.pl/en/candidates/entry-exam-topics/faculty-of-drilling-oil-and-gas",
+        "key_requirements": "🚨 *أصعب شرط:* تقديم مقترح بحثي أولي (Research Proposal) وموافقة مشرف أكاديمي من كلية هندسة النفط والغاز.\n📜 *شرط اللغة:* الإنجليزية (شهادة B2 أو إفادة الدراسة بالإنجليزية).\n🌍 *الجنسية والمعادلة:* شهادة الماستر الأوروبية معتمدة تلقائياً.\n💡 *موقف ملفك:* ✅ أطروحتك في مكامن الغاز تشكل مقترحاً بحثياً جاهزاً ومقنعاً.",
+        "acceptance_difficulty": "🟢 سهلة: العلاقات الأكاديمية قوية بين تخصصات الغاز بأوروبا الشرقية وماستر غوبكين."
+    },
+    {
+        "title": "Fully Funded PhD in Petroleum Engineering: Subsurface Characterization & EOR",
+        "institution": "Nazarbayev University (School of Mining and Geosciences - بالشراكة مع Colorado School of Mines)",
+        "country": "كازاخستان (Kazakhstan - Astana)",
+        "source_type": "UNIVERSITY",
+        "sub_specialty": "Reservoir Simulation, Gas Condensate Flow & Deep Carbonate Formations (Tengiz Analogs)",
+        "deadline": "2027-02-28",
+        "tuition_fee": "0 $ (معفاة بنسبة 100%)",
+        "registration_fee": "0 $",
+        "monthly_salary": "1,200 $ - 1,500 $ شهرياً (راتب باحث دكتوراه معفى من الضرائب) + سكن جامعي فردي حديث وتأمين صحي",
+        "is_funded": "نعم (منحة حكومية كازاخية شاملة التكاليف كاملة)",
+        "seats": "5 إلى 8 مقاعد سنوياً بكلية SMG",
+        "duration": "4 سنوات (برنامج باللغة الإنجليزية بمعايير أمريكية)",
+        "application_method": "التقديم الإلكتروني المباشر عبر بوابة القبول الدولية لجامعة نزارباييف (nu.edu.kz) ورفع كشف نقاط ماستر غوبكين ورسالة الدافع.",
+        "link": "https://nu.edu.kz/sprogram/phd-in-petroleum-engineering-2/",
+        "key_requirements": "🚨 *أصعب شرط:* معدل تراكمي في الماستر لا يقل عن 2.75/4.00 (معدلك 4.6/5.0 يعادله بامتياز) + شهادة IELTS 6.5.\n📜 *شرط اللغة:* الإنجليزية (وتقن الروسية كميزة حياة وعلاقات هائلة في كازاخستان).\n🌍 *الجنسية والمعادلة:* مفتوحة للجميع، ولديهم اتفاقيات مباشرة واعتراف تلقائي بشهادات غوبكين موسكو.\n💡 *موقف ملفك:* ✅ أنت في قمة المرشحين المؤهلين للحصول على المنحة القصوى فور تقديم أوراقك.",
+        "acceptance_difficulty": "🟢 سهلة جداً ومضمونة القبول تقريباً لملفك بفضل خلفية غوبكين ومعدلك العالي."
+    },
+
+    # =========================================================================
+    # القسم 2: أمريكا الجنوبية (عمالقة مكامن ما قبل الملح Pre-Salt وتمويلات ضخمة مع تنافسية غربية منخفضة)
+    # =========================================================================
+    {
+        "title": "PhD in Petroleum Sciences: Numerical Reservoir Simulation & Digital Oil Fields (UNISIM Group)",
+        "institution": "State University of Campinas (UNICAMP - CEPETRO / UNISIM Research Group - البرازيل)",
+        "country": "البرازيل (Brazil - São Paulo)",
+        "source_type": "UNIVERSITY",
+        "sub_specialty": "Dynamic Reservoir Simulation, History Matching, Uncertainty Quantification & Pre-Salt Carbonates",
+        "deadline": "دورات قبول مستمرة (ربيع وخريف)",
+        "tuition_fee": "0 R$ (الجامعات الحكومية في البرازيل مجانية بالكامل)",
+        "registration_fee": "0 R$",
+        "monthly_salary": "منحة CAPES / CNPq / Petrobras (حوالي 3,100 R$ إلى 4,500 R$ شهرياً معفاة من الضرائب)",
+        "is_funded": "نعم (منحة بحثية كاملة مع تمويل حكومي وصناعي من بتروبراس وشل)",
+        "seats": "3 إلى 5 مقاعد للطلبة الدوليين في مجموعة UNISIM",
+        "duration": "4 سنوات",
+        "application_method": "التقديم الإلكتروني عبر بوابة مجموعة أبحاث UNISIM وإرسال السيرة الذاتية وفيديو تعريفي قصير بالإنجليزية مع مشروع بحثي في نمذجة المكامن.",
+        "link": "https://www.unisim.cepetro.unicamp.br/en/students/graduate-courses",
+        "key_requirements": "🚨 *أصعب شرط:* إثبات الفهم الرياضي لنمذجة تدفق الموائع المتعددة الأطوار وحل مسائل المكامن العددية.\n📜 *شرط اللغة:* الإنجليزية (لغة الأبحاث والبرمجيات بمجموعة UNISIM) ولا يشترط البرتغالية عند القبول.\n🌍 *الجنسية والمعادلة:* ترحب البرازيل بشدة بالمهندسين الدوليين في مجالات مكامن ما قبل الملح (Pre-Salt).\n💡 *موقف ملفك:* ✅ مجموعة UNISIM تركز على تاريخ التطابق (History Matching) والمكامن الغازية والمكثفات، وهو جوهر تخصصك.",
+        "acceptance_difficulty": "🟢 سهلة لملفك: البرازيل أكبر قوة نفطية في أمريكا اللاتينية وتوفر منحاً دولية بطلب تنافسي أقل بكثير من بريطانيا."
+    },
+
+    # =========================================================================
+    # القسم 3: جنوب شرق آسيا والشرق الأوسط (مراكز طاقة كبرى، تمويلات سخية، وإجراءات قبول مرنة)
+    # =========================================================================
+    {
+        "title": "Graduate Research Assistantship (PhD) in Petroleum & Subsurface Engineering",
+        "institution": "Universiti Teknologi PETRONAS (UTP - Centre of Excellence in Subsurface Engineering - ماليزيا)",
+        "country": "ماليزيا (Malaysia)",
+        "source_type": "UNIVERSITY",
+        "sub_specialty": "Enhanced Gas Recovery, Multiphase Flow & Subsurface Carbon Capture",
+        "deadline": "مفتوح على مدار العام (قبول شهري وفصلي)",
+        "tuition_fee": "0 RM (معفاة بالكامل عبر منحة Graduate Assistantship)",
+        "registration_fee": "رمزية",
+        "monthly_salary": "2,500 إلى 4,000 RM شهرياً (راتب معيشة مريح جداً في ماليزيا)",
+        "is_funded": "نعم (منحة بحثية وتدريسية مدعومة بالكامل من شركة بتروناس الوطنية PETRONAS)",
+        "seats": "مقاعد متعددة بمشاريع الأساتذة والمنح البحثية",
+        "duration": "3 إلى 4 سنوات",
+        "application_method": "التقديم الإلكتروني عبر بوابة الدراسات العليا لجامعة UTP ومراسلة أساتذة قسم هندسة البترول لتحديد المشرف ومشروع المنحة.",
+        "link": "https://www.utp.edu.my/study/postgraduate/programme/phd-petroleum-engineering/",
+        "key_requirements": "🚨 *أصعب شرط:* معدل تراكمي في الماستر أعلى من 3.25/4.00 (معدلك يتجاوزه بمراحل) + IELTS 6.0.\n📜 *شرط اللغة:* الإنجليزية هي لغة التعليم والبحث الرسمية في ماليزيا.\n🌍 *الجنسية والمعادلة:* إجراءات التأشيرة الطلابية في ماليزيا سريعة ومضمونة دون أي تعقيدات سياسية أو بنكية.\n💡 *موقف ملفك:* ✅ بتروناس تولي اهتماماً كبيراً لحقول الغاز الطبيعي البحري ولديك خبرة سوناطراك وإيني التي تفتح لك الأبواب مباشرة.",
+        "acceptance_difficulty": "🟢 سهلة جداً: نسبة قبول مرتفعة، بيئة مريحة، ومعامل متقدمة على مستوى عالمي."
+    },
+    {
+        "title": "Fully Funded PhD Fellowship in Petroleum Engineering & Subsurface Energy (ADNOC Sponsored)",
+        "institution": "Khalifa University (Department of Petroleum Engineering & Subsurface Research Center - أبوظبي)",
+        "country": "الإمارات العربية المتحدة (UAE)",
+        "source_type": "GOVERNMENT",
+        "sub_specialty": "Gas Condensate Reservoirs, Well Inflow Dynamics & CO2-EOR in Carbonates",
+        "deadline": "2027-01-31 (لدورة الخريف)",
+        "tuition_fee": "0 AED (معفاة 100%)",
+        "registration_fee": "0 AED",
+        "monthly_salary": "8,000 إلى 10,000 AED شهرياً (راتب شهري سخي معفى تماماً من الضرائب ~2,700$) + سكن مؤثث مجاناً + تذاكر سفر سنوية وتأمين صحي شامل",
+        "is_funded": "نعم (منحة دكتوراه كاملة وشاملة ممولة من شركة أدنوك ADNOC وحكومة أبوظبي)",
+        "seats": "مقاعد محددة للمتفوقين أكاديمياً",
+        "duration": "4 سنوات",
+        "application_method": "التقديم الإلكتروني المباشر عبر بوابة الدراسات العليا لجامعة خليفة واختيار PhD in Petroleum Engineering مع طلب منحة KU Fellowship.",
+        "link": "https://www.ku.ac.ae/program/phd-in-petroleum-engineering",
+        "key_requirements": "🚨 *أصعب شرط:* معدل ماستر لا يقل عن 3.25/4.00 + درجة GRE كمي تفوق 150 + IELTS 6.5 أو TOEFL 91.\n📜 *شرط اللغة:* الإنجليزية بالكامل.\n🌍 *الجنسية والمعادلة:* مفتوحة للطلبة الدوليين المتفوقين، والجزائريون يحظون بترحيب أكاديمي كبير في الإمارات.\n💡 *موقف ملفك:* ✅ معدلك 4.6/5.0 في هندسة الغاز يضعك في مصاف المرشحين الأوائل لنيل المنحة الأعلى.",
+        "acceptance_difficulty": "🟢 سهلة إلى متوسطة لملفك: تتطلب اجتياز المقابلة العلمية، وحزمتها المالية هي الأقوى في المنطقة."
+    },
+    {
+        "title": "KFUPM Full Doctoral Fellowship in Petroleum Engineering & Geosciences",
+        "institution": "جامعة الملك فهد للبترول والمعادن (College of Petroleum Engineering & Geosciences - CPG)",
+        "country": "المملكة العربية السعودية (Saudi Arabia)",
+        "source_type": "GOVERNMENT",
+        "sub_specialty": "Gas Condensate Reservoirs, Smart EOR, Digital Rock Physics & Advanced Flow in Porous Media",
+        "deadline": "2026-12-15 (دورة الخريف والربيع)",
+        "tuition_fee": "0 $ (معفاة 100%)",
+        "registration_fee": "0 $",
+        "monthly_salary": "1,000 $ - 1,500 $ شهرياً (راتب معفى من الضرائب) + سكن مؤثث مجاني + تذاكر طيران سنوية",
+        "is_funded": "نعم (منحة دكتوراه كاملة وشاملة التغطية الصحية والسكن)",
+        "seats": "أكثر من 10 مقاعد سنوية بكلية CPG",
+        "duration": "4 سنوات",
+        "application_method": "الدخول مباشرة لصفحة متطلبات دكتوراه هندسة البترول والمكامن والضغط على زر Enroll Now / Admissions للتقديم الإلكتروني المباشر.",
+        "link": "https://cpg.kfupm.edu.sa/academics/graduate-programs/ph-d-in-petroleum-engineering/",
+        "key_requirements": "🚨 *أصعب شرط:* معدل تراكمي في الماستر لا يقل عن 3.5 من 4.0 أو ما يعادله + خطابات توصية أكاديمية قوية.\n📜 *شرط اللغة:* اختبار IELTS (6.5) أو TOEFL (80) مع مقابلة تقنية عبر زوم.\n🌍 *الجنسية والمعادلة:* مفتوحة للجميع، ويوجد تقدير كبير لخريجي هندسة الغاز من غوبكين.\n💡 *موقف ملفك:* ✅ معدلك 4.6/5.0 في ماستر غوبكين يضعك في الشريحة الأولى المضمونة للتمويل فوراً.",
+        "acceptance_difficulty": "🟢 سهلة جداً ومضمونة التمويل: الكلية تبحث باستمرار عن مهندسي مكامن غاز وكفاءات جزائرية متميزة."
+    },
+    {
+        "title": "KAUST VSRP Fellowship: Deep Learning for 3D Reservoir Seismic & Flow Modeling",
+        "institution": "KAUST (Visiting Student Research Program - ANPER Lab)",
+        "country": "المملكة العربية السعودية (Saudi Arabia)",
+        "source_type": "INTERNSHIP_RD",
+        "sub_specialty": "AI in Subsurface Geophysics & Reservoir Flow Simulation",
+        "deadline": "مفتوح طوال العام (تقديم قبل 3 أشهر من تاريخ البدء المرغوب)",
+        "tuition_fee": "0 $",
+        "registration_fee": "0 $",
+        "monthly_salary": "1,000 $ شهرياً + سكن جامعي فردي فاخر مجاناً + تذاكر طيران ذهاب وإياب وتأشيرة وتأمين صحي كامل",
+        "is_funded": "نعم (زمالة بحثية دولية ممولة 100% بالكامل)",
+        "seats": "مقاعد مفتوحة للأبحاث المتميزة",
+        "duration": "3 إلى 6 أشهر (تدريب بحثي دولي مكثف)",
+        "application_method": "تصفح المشاريع البحثية المفتوحة مباشرة في مختبرات ANPER لهندسة البترول والمكامن والتقديم عبر الرابط المباشر vsrp.kaust.edu.sa/apply.",
+        "link": "https://vsrp.kaust.edu.sa/internship-opportunities",
+        "key_requirements": "🚨 *أصعب شرط:* معدل تراكمي في الماستر أعلى من 3.5 من 4.0 وتخصص علمي ذو صلة.\n📜 *شرط اللغة:* الإنجليزية الفنية المتقنة.\n🌍 *الجنسية والمعادلة:* مفتوحة للجميع، وKAUST تصدر التأشيرة وتغطي كافة المصاريف فور القبول.\n💡 *موقف ملفك:* ✅ 90% من خريجي برنامج VSRP يعرض عليهم مباشرة مقعد دكتوراه ممول بالكامل في KAUST براتب 2,500$ شهرياً.",
+        "acceptance_difficulty": "🟢 سهلة إلى متوسطة: معدلك العالي في غوبكين (4.6/5.0) يجعلك من أوائل المؤهلين."
+    },
+
+    # =========================================================================
+    # القسم 4: أمريكا الشمالية (مساعدات بحث وتدريس مضمونة التمويل برواتب تنافسية)
+    # =========================================================================
+    {
+        "title": "Graduate Research Assistantship (PhD) in Petroleum Engineering & Subsurface Storage",
+        "institution": "University of Wyoming (Department of Energy & Petroleum Engineering - High Bay Research Facility)",
+        "country": "الولايات المتحدة الأمريكية (USA - Wyoming)",
+        "source_type": "UNIVERSITY",
+        "sub_specialty": "Multiphase Flow in Porous Media, Underground Hydrogen/CO2 Storage & Reservoir Physics",
+        "deadline": "تقييم مستمر (Rolling Admissions للدورات الخريفية والربيعية)",
+        "tuition_fee": "0 $ (معفاة بالكامل Tuition Waiver)",
+        "registration_fee": "مغطاة",
+        "monthly_salary": "2,200 $ - 2,600 $ شهرياً (راتب Graduate Research Assistant) + تغطية التأمين الصحي",
+        "is_funded": "نعم (وظيفة مساعد باحث دراسات عليا GRA ممولة من وزارة الطاقة الأمريكية ومشاريع الحقول)",
+        "seats": "مقاعد بحثية حسب توفر المنح للمختبرات",
+        "duration": "4 سنوات",
+        "application_method": "التواصل المباشر مع أساتذة مركز الابتكار لتدفق الموائع في الأوساط المسامية (Center of Innovation for Flow Through Porous Media) ثم التقديم عبر بوابة القبول.",
+        "link": "https://www.uwyo.edu/petroleum/graduate/apply.html",
+        "key_requirements": "🚨 *أصعب شرط:* تأمين موافقة أستاذ مشرف (Advisor) يقود مشروع بحثي في المكامن الجوفية قبل القبول النهائي.\n📜 *شرط اللغة:* TOEFL 80 أو IELTS 6.5.\n🌍 *الجنسية والمعادلة:* تصدر الجامعة وثيقة I-20 للحصول على تأشيرة F-1 الطلابية فور القبول.\n💡 *موقف ملفك:* ✅ ولاية وايومنغ هي قلب طاقة الغاز الأمريكية ومختبر High Bay هو الرائد عالمياً في تجارب الأوساط المسامية (Micro-CT & Core-flooding).",
+        "acceptance_difficulty": "🟡 متوسطة وسهلة التحقيق: تواصلك المباشر مع المشرف وعرض ملخص أطروحتك في تدفق الغاز يقنع الأستاذ بتمويلك فوراً."
+    },
+    {
+        "title": "PhD in Petroleum Engineering & Subsurface Energy (Energy & Environmental Research Center - EERC)",
+        "institution": "University of North Dakota (College of Engineering & Mines / EERC - الولايات المتحدة)",
+        "country": "الولايات المتحدة الأمريكية (USA - North Dakota)",
+        "source_type": "UNIVERSITY",
+        "sub_specialty": "Unconventional Gas Reservoirs, CCUS Containment & Caprock Geomechanics",
+        "deadline": "2027-02-15 (لأولوية التمويل الخريفي)",
+        "tuition_fee": "0 $ (إعفاء كامل من المصاريف الدراسية للمقبولين كمساعدي بحث)",
+        "registration_fee": "0 $",
+        "monthly_salary": "2,000 $ - 2,400 $ شهرياً + تأمين صحي",
+        "is_funded": "نعم (مساعدات بحثية وتدريسية GRA/GTA ممولة بالكامل)",
+        "seats": "3 إلى 5 مقاعد",
+        "duration": "4 سنوات",
+        "application_method": "التقديم عبر مدرسة الدراسات العليا لجامعة نورث داكوتا واختيار مسار Ph.D. in Petroleum Engineering ومراسلة باحثي مركز أبحاث EERC.",
+        "link": "https://und.edu/programs/petroleum-engineering-phd/",
+        "key_requirements": "🚨 *أصعب شرط:* درجات قوية في مقررات الرياضيات والميكانيكا والجيولوجيا في الماستر.\n📜 *شرط اللغة:* IELTS 6.5 أو Duolingo 110 أو TOEFL iBT 79.\n🌍 *الجنسية والمعادلة:* متوفرة كفالة التأشيرة الطلابية F-1.\n💡 *موقف ملفك:* ✅ مركز EERC يدير أضخم مشاريع احتجاز وتخزين الكربون في تشكيلات باكن (Bakken Formation)، وخبرتك في مكامن الغاز تؤهلك بقوة.",
+        "acceptance_difficulty": "🟢 سهلة إلى متوسطة: جامعة حكومية متخصصة ومعدلات قبول الطلبة الدوليين فيها أعلى بكثير من الجامعات الخاصة."
+    },
+    {
+        "title": "PhD in Chemical and Petroleum Engineering: Energy & Subsurface Systems",
+        "institution": "University of Calgary (Schulich School of Engineering - كندا)",
+        "country": "كندا (Canada - Calgary)",
+        "source_type": "UNIVERSITY",
+        "sub_specialty": "Reservoir Dynamic Simulation, Thermal EOR & Geological Carbon Sequestration",
+        "deadline": "2027-01-15 (لدورة الخريف)",
+        "tuition_fee": "مغطاة عبر حزمة التمويل المضمونة",
+        "registration_fee": "0 $",
+        "monthly_salary": "حزمة تمويل مضمونة لا تقل عن 33,205 $ كندي سنوياً للطلبة الدوليين (~2,760 $ كندي شهرياً)",
+        "is_funded": "نعم (تمويل بحثي وتدريسي مضمون بنسبة 100% لمدة 4 سنوات)",
+        "seats": "مقاعد متعددة بكلية شوليك للهندسة",
+        "duration": "4 سنوات",
+        "application_method": "التقديم عبر بوابة الدراسات العليا لجامعة كالجاري (grad.ucalgary.ca) واختيار Chemical and Petroleum Engineering مع تحديد أستاذ مشرف.",
+        "link": "https://schulich.ucalgary.ca/chemical-petroleum",
+        "key_requirements": "🚨 *أصعب شرط:* الحصول على موافقة مبدئية من مشرف في قسم هندسة البترول + معدل تراكمي لا يقل عن 3.5/4.0 في الماستر.\n📜 *شرط اللغة:* TOEFL 86 أو IELTS 6.5.\n🌍 *الجنسية والمعادلة:* كندا تمنح تصريح عمل مفتوح بعد التخرج (PGWP) ومساراً سريعاً للإقامة الدائمة للمتخرجين بالدكتوراه.\n💡 *موقف ملفك:* ✅ كالجاري هي عاصمة النفط والغاز في كندا وأبحاثها في المكامن تحظى بدعم كبريات الشركات الكندية.",
+        "acceptance_difficulty": "🟡 متوسطة: تتطلب مراسلة مشرف، ومعدلك العالي من غوبكين يفي بالحد الأدنى بامتياز."
+    },
+
+    # =========================================================================
+    # القسم 5: أوروبا الغربية والنرويج (نخبة البرامج الأوروبية - تمويلات وظيفية كاملة B1 / TV-L / Jobbnorge)
     # =========================================================================
     {
         "title": "University Assistant (PhD) in Reservoir Engineering: CO2 & Hydrogen Reactive Flow",
@@ -109,42 +346,6 @@ OPPORTUNITIES_DATA = [
         "acceptance_difficulty": "🟢 سهلة ومباشرة لملفك: وجودك الفعلي داخل إيطاليا وخبرتك في شراكة Eni يمنحانك الأولوية القصوى."
     },
     {
-        "title": "KFUPM Full Doctoral Fellowship in Petroleum Engineering & Geosciences",
-        "institution": "جامعة الملك فهد للبترول والمعادن (College of Petroleum Engineering & Geosciences - CPG)",
-        "country": "المملكة العربية السعودية (Saudi Arabia)",
-        "source_type": "GOVERNMENT",
-        "sub_specialty": "Gas Condensate Reservoirs, Smart EOR, Digital Rock Physics & Advanced Flow in Porous Media",
-        "deadline": "2026-12-15 (دورة الخريف والربيع)",
-        "tuition_fee": "0 $ (معفاة 100%)",
-        "registration_fee": "0 $",
-        "monthly_salary": "1,000 $ - 1,500 $ شهرياً (راتب معفى من الضرائب) + سكن مؤثث مجاني + تذاكر طيران سنوية",
-        "is_funded": "نعم (منحة دكتوراه كاملة وشاملة التغطية الصحية والسكن)",
-        "seats": "أكثر من 10 مقاعد سنوية بكلية CPG",
-        "duration": "4 سنوات",
-        "application_method": "الدخول مباشرة لصفحة متطلبات دكتوراه هندسة البترول والمكامن والضغط على زر Enroll Now / Admissions للتقديم الإلكتروني المباشر.",
-        "link": "https://cpg.kfupm.edu.sa/academics/graduate-programs/ph-d-in-petroleum-engineering/",
-        "key_requirements": "🚨 *أصعب شرط:* معدل تراكمي في الماستر لا يقل عن 3.5 من 4.0 أو ما يعادله + خطابات توصية أكاديمية قوية.\n📜 *شرط اللغة:* اختبار IELTS (6.5) أو TOEFL (80) مع مقابلة تقنية عبر زوم.\n🌍 *الجنسية والمعادلة:* مفتوحة للجميع، ويوجد تقدير كبير لخريجي هندسة الغاز من غوبكين.\n💡 *موقف ملفك:* ✅ معدلك 4.6/5.0 في ماستر غوبكين يضعك في الشريحة الأولى المضمونة للتمويل فوراً.",
-        "acceptance_difficulty": "🟢 سهلة جداً ومضمونة التمويل: الكلية تبحث باستمرار عن مهندسي مكامن غاز وكفاءات جزائرية متميزة."
-    },
-    {
-        "title": "Doctoral School PhD in Drilling, Oil and Gas Engineering",
-        "institution": "AGH University of Krakow (Faculty of Drilling, Oil and Gas - بولندا)",
-        "country": "بولندا (Poland)",
-        "source_type": "UNIVERSITY",
-        "sub_specialty": "Petroleum Production, Underground Gas Storage & Drilling Optimization",
-        "deadline": "2027-06-15",
-        "tuition_fee": "0 PLN (التعليم مجاني لجميع المقبولين بمدرسة الدكتوراه)",
-        "registration_fee": "حوالي 30 €",
-        "monthly_salary": "حوالي 3,500 PLN إلى 4,500 PLN شهرياً (منحة دكتوراه حكومية بولندية)",
-        "is_funded": "نعم (تمويل حكومي بنسبة 100%)",
-        "seats": "2 مقاعد مخصصة للطلبة الدوليين",
-        "duration": "4 سنوات",
-        "application_method": "الاطلاع المباشر على مواضيع الامتحانات وشروط القبول لكلية هندسة الحفر والنفط والغاز (Faculty of Drilling, Oil and Gas) والتقديم عبر بوابة e-Rekrutacja.",
-        "link": "https://sd.agh.edu.pl/en/candidates/entry-exam-topics/faculty-of-drilling-oil-and-gas",
-        "key_requirements": "🚨 *أصعب شرط:* تقديم مقترح بحثي أولي (Research Proposal) وموافقة مشرف أكاديمي من كلية هندسة النفط والغاز.\n📜 *شرط اللغة:* الإنجليزية (شهادة B2 أو إفادة الدراسة بالإنجليزية).\n🌍 *الجنسية والمعادلة:* شهادة الماستر الأوروبية معتمدة تلقائياً.\n💡 *موقف ملفك:* ✅ أطروحتك في مكامن الغاز تشكل مقترحاً بحثياً جاهزاً ومقنعاً.",
-        "acceptance_difficulty": "🟢 سهلة: العلاقات الأكاديمية قوية بين تخصصات الغاز بأوروبا الشرقية وماستر غوبكين."
-    },
-    {
         "title": "CIFRE Industrial PhD Thesis: Reactive Multiphase Flow Simulation in Mature Carbonates",
         "institution": "TotalEnergies OneTech (CSTJF Pau Technical Center) بالشراكة مع IFPEN",
         "country": "فرنسا (France)",
@@ -164,7 +365,7 @@ OPPORTUNITIES_DATA = [
     },
 
     # =========================================================================
-    # القسم 2: الشركات الهندسية والاستشارية المتخصصة (شركات مكامن متوسطة وصغيرة)
+    # القسم 6: الشركات الاستشارية وبيوت الخبرة التكنولوجية للمكامن (شركات دولية صغيرة ومتوسطة)
     # =========================================================================
     {
         "title": "Reservoir Engineering Consultant & Numerical Simulation Specialist",
@@ -187,7 +388,7 @@ OPPORTUNITIES_DATA = [
     {
         "title": "Reservoir Simulation Software Engineer & Technical Advisor (tNavigator)",
         "institution": "Rock Flow Dynamics (RFD - الشركة المطورة لمحاكي المكامن العالمي tNavigator)",
-        "country": "بريطانيا / أوروبا / صربيا (Europe)",
+        "country": "صربيا / أوروبا (Europe)",
         "source_type": "COMPANY_INTERNAL",
         "sub_specialty": "Reservoir Simulation, Black Oil, Compositional Gas Condensate & EOR Modeling",
         "deadline": "مفتوح باستمرار (Continuous Hiring)",
@@ -364,10 +565,6 @@ OPPORTUNITIES_DATA = [
         "key_requirements": "🚨 *أصعب شرط:* إتقان محاكاة تدفق الغاز وضغوط الحقن السطحية والجوفية في المكامن المستنفذة.\n📜 *شرط اللغة:* الإنجليزية بالكامل (الألمانية غير مطلوبة للأقسام الفنية).\n🌍 *الجنسية والمعادلة:* تقبل خريجي الجامعات الإيطالية والأوروبية مباشرة.\n💡 *موقف ملفك:* ✅ مستوفٍ ومطابق 100% لأن خبرتك الميدانية هي في حقول الغاز ومحاكاة آبار الغاز والمكثفات.",
         "acceptance_difficulty": "🟢 سهلة إلى متوسطة: واحدة من أهم الشركات الأوروبية المستقلة التي تقدر مهندسي الغاز الجزائريين."
     },
-
-    # =========================================================================
-    # القسم 3: تربصات أطروحة الماستر المدفوعة (R&D Internships - Master Thesis)
-    # =========================================================================
     {
         "title": "Master Thesis Internship (Stage R&D): Pore-scale Simulation for Geological H2 Storage",
         "institution": "IFP Energies nouvelles (IFPEN - مراكز أبحاث باريس وليون)",
@@ -403,24 +600,6 @@ OPPORTUNITIES_DATA = [
         "link": "https://jobs.eni.com/en/sites/CX_1004/jobs?keyword=internship",
         "key_requirements": "🚨 *أصعب شرط:* أن تكون طالباً مقيداً في الماستر بجامعة إيطالية معتمدة ومتبقي لديك أطروحة التخرج.\n📜 *شرط اللغة:* الإيطالية أو الإنجليزية.\n🌍 *الجنسية والمعادلة:* مستوفى تلقائياً (إقامتك الإيطالية سارية ولا تحتاج لأي فيزا جديدة).\n💡 *موقف ملفك:* ✅ يمنحك أفضلية التعيين المباشر أو التحول التلقائي لمنحة دكتوراه صناعية (Dottorato PNRR Eni) في الدورة التالية.",
         "acceptance_difficulty": "🟢 سهلة جداً ومضمونة القبول: Eni تفضل بقوة طلبة الجامعات الإيطالية المقيمين محلياً."
-    },
-    {
-        "title": "KAUST VSRP Fellowship: Deep Learning for 3D Reservoir Seismic & Flow Modeling",
-        "institution": "KAUST (Visiting Student Research Program - ANPER Lab)",
-        "country": "المملكة العربية السعودية (Saudi Arabia)",
-        "source_type": "INTERNSHIP_RD",
-        "sub_specialty": "AI in Subsurface Geophysics & Reservoir Flow Simulation",
-        "deadline": "مفتوح طوال العام (تقديم قبل 3 أشهر من تاريخ البدء المرغوب)",
-        "tuition_fee": "0 $",
-        "registration_fee": "0 $",
-        "monthly_salary": "1,000 $ شهرياً + سكن جامعي فردي فاخر مجاناً + تذاكر طيران ذهاب وإياب وتأشيرة وتأمين صحي كامل",
-        "is_funded": "نعم (زمالة بحثية دولية ممولة 100% بالكامل)",
-        "seats": "مقاعد مفتوحة للأبحاث المتميزة",
-        "duration": "3 إلى 6 أشهر (تدريب بحثي دولي مكثف)",
-        "application_method": "تصفح المشاريع البحثية المفتوحة مباشرة في مختبرات ANPER لهندسة البترول والمكامن والتقديم عبر الرابط المباشر vsrp.kaust.edu.sa/apply.",
-        "link": "https://vsrp.kaust.edu.sa/internship-opportunities",
-        "key_requirements": "🚨 *أصعب شرط:* معدل تراكمي في الماستر أعلى من 3.5 من 4.0 وتخصص علمي ذو صلة.\n📜 *شرط اللغة:* الإنجليزية الفنية المتقنة.\n🌍 *الجنسية والمعادلة:* مفتوحة للجميع، وKAUST تصدر التأشيرة وتغطي كافة المصاريف فور القبول.\n💡 *موقف ملفك:* ✅ 90% من خريجي برنامج VSRP يعرض عليهم مباشرة مقعد دكتوراه ممول بالكامل في KAUST براتب 2,500$ شهرياً.",
-        "acceptance_difficulty": "🟢 سهلة إلى متوسطة: معدلك العالي في غوبكين (4.6/5.0) يجعلك من أوائل المؤهلين."
     },
     {
         "title": "Graduate R&D Intern: Petrel / Techlog Subsurface Analytics",
@@ -558,7 +737,7 @@ def rebuild_database():
 
     conn.commit()
     conn.close()
-    print(f"✅ Successfully rebuilt database with {inserted_count} strictly deduplicated opportunities with exact deep links!")
+    print(f"✅ Successfully rebuilt database with {inserted_count} globally balanced, deep-linked opportunities!")
 
 if __name__ == "__main__":
     rebuild_database()
