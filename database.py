@@ -313,7 +313,7 @@ def get_reservoir_storage_opportunities() -> List[Dict]:
 
 def get_easy_opportunities() -> List[Dict]:
     all_opps = get_all_active_open()
-    return [o for o in all_opps if "سهلة" in o.get("acceptance_difficulty", "") or "إيطاليا" in o.get("country", "")]
+    return [o for o in all_opps if "سهلة" in o.get("acceptance_difficulty", "")]
 
 def get_opportunities_by_country(country_name: str) -> List[Dict]:
     conn = get_connection()
