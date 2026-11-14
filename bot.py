@@ -50,7 +50,9 @@ from database import (
     get_new_opportunities_for_alert,
     mark_as_notified_new,
     get_closing_soon_opportunities,
-    mark_as_notified_closing
+    mark_as_notified_closing,
+    authorize_user,
+    is_user_authorized
 )
 from hunter import execute_deep_hunt, HUNTING_TARGETS
 from data.professors import TOP_PROFESSORS_RADAR
@@ -143,11 +145,76 @@ async def send_paginated_opportunity(update: Update, context: ContextTypes.DEFAU
             disable_web_page_preview=True
         )
 
-# ----------------- أوامر البوت الأساسية -----------------
-async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# الرمز السري الحصري للوصول للبوت (خاص بالمهندس بلال حداد فقط)
+SECRET_ACCESS_TOKEN = "bilal_petro_vip"
+
+AUTH_LOCKED_TEXT = """
+🔒 *عذراً، هذا الرادار مخصص وخاص.*
+
+هذا البوت مخصص حصرياً للمهندس *بلال حداد* (Bilal Haddad) لمتابعة واقتناص فرص الدكتوراه والتربصات المتقدمة في هندسة المكامن والبترول والطاقة الجوفية.
+
+إذا كنت صاحب الرادار وتستخدم حساباً جديداً، يرجى الدخول عبر رابط الدعوة الحصري:
+🔗 `https://t.me/bilal_petro_phd_bot?start=bilal_petro_vip`
+
+أو إرسال رمز التفعيل الخاص مباشرة في المحادثة:
+`/auth bilal_petro_vip`
+"""
+
+def check_user_auth(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     chat = update.effective_chat
     user = update.effective_user
-    user_name = user.first_name if user else "يا مهندس"
+    if not chat:
+        return False
+    chat_id = str(chat.id)
+    username = user.username if user else ""
+    first_name = user.first_name if user else ""
+
+    # التحقق من باراميتر البدء في الرابط العميق: /start bilal_petro_vip
+    if context.args and len(context.args) > 0 and context.args[0].strip() == SECRET_ACCESS_TOKEN:
+        authorize_user(chat_id, username, first_name)
+        return True
+
+    # التحقق من قاعدة البيانات أو اليوزرنيم المعتمد
+    if is_user_authorized(chat_id, username):
+        return True
+
+    return False
+
+# ----------------- أوامر البوت الأساسية -----------------
+async def cmd_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat = update.effective_chat
+    user = update.effective_user
+    chat_id = str(chat.id)
+    username = user.username if user else ""
+    first_name = user.first_name if user else ""
+
+    token = context.args[0].strip() if context.args else ""
+    text = update.message.text.strip() if update.message and update.message.text else ""
+    if not token and SECRET_ACCESS_TOKEN in text:
+        token = SECRET_ACCESS_TOKEN
+
+    if token == SECRET_ACCESS_TOKEN:
+        authorize_user(chat_id, username, first_name)
+        await update.message.reply_text(
+            f"🔓 *تم التحقق بنجاح وتفعيل وصولك الحصري يا مهندس {first_name or 'بلال'}!*\n\nأهلاً بك في رادارك الخاص لصيد دكتوراه هندسة البترول والمكامن.",
+            parse_mode="Markdown",
+            reply_markup=REPLY_MARKUP
+        )
+        await cmd_start(update, context)
+    else:
+        await update.message.reply_text(
+            "❌ رمز الدخول غير صحيح. يرجى إدخال الرمز الصحيح عبر:\n`/auth bilal_petro_vip`",
+            parse_mode="Markdown"
+        )
+
+async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not check_user_auth(update, context):
+        await update.message.reply_text(AUTH_LOCKED_TEXT, parse_mode="Markdown")
+        return
+
+    chat = update.effective_chat
+    user = update.effective_user
+    user_name = user.first_name if user else "يا مهندس بلال"
 
     if chat:
         add_subscriber(chat_id=str(chat.id), username=user.username or "", first_name=user.first_name or "")
@@ -158,35 +225,54 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     welcome_text = f"""
 مرحباً بك يا مهندس {user_name}! 🛢️🌍
-*رادار وصياد دكتوراه هندسة البترول والمكامن والطاقة الجوفية العالمي*
+*رادار وصياد دكتوراه هندسة البترول والمكامن والطاقة الجوفية الحصري*
 
 📊 *حالة الرادار السحابي المباشرة:*
 • إجمالي الفرص النشطة المصطادة: *{len(all_opps)} فرصة*
 • مكامن وتخزين جوفي (CCUS/H2): *{len(res_opps)} فرصة*
 • متطلب الخبرة: *0 سنوات (مفتوحة لحديثي التخرج من الماستر)*
-• حالة الروابط: *100% مؤكدة ومفحوصة (Zero 404)*
+• حالة الروابط: *100% مؤكدة ومفحوصة (Zero Dead Links)*
 • السيرفر السحابي: *يعمل 24/7 دون توقف*
+• الحساب: *مصرح ومحمي حصرياً لك*
 
 👇 *استخدم الأزرار التفاعلية بالأسفل للتصفح السلس بنقرة واحدة:*
 """
     await update.message.reply_text(welcome_text, parse_mode="Markdown", reply_markup=REPLY_MARKUP)
 
 async def cmd_reservoir(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not check_user_auth(update, context):
+        await update.message.reply_text(AUTH_LOCKED_TEXT, parse_mode="Markdown")
+        return
     await send_paginated_opportunity(update, context, category="reservoir_storage", page=0)
 
 async def cmd_no_exp(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not check_user_auth(update, context):
+        await update.message.reply_text(AUTH_LOCKED_TEXT, parse_mode="Markdown")
+        return
     await send_paginated_opportunity(update, context, category="no_exp", page=0)
 
 async def cmd_easy(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not check_user_auth(update, context):
+        await update.message.reply_text(AUTH_LOCKED_TEXT, parse_mode="Markdown")
+        return
     await send_paginated_opportunity(update, context, category="easy", page=0)
 
 async def cmd_corporate(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not check_user_auth(update, context):
+        await update.message.reply_text(AUTH_LOCKED_TEXT, parse_mode="Markdown")
+        return
     await send_paginated_opportunity(update, context, category="corporate", page=0)
 
 async def cmd_internships(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not check_user_auth(update, context):
+        await update.message.reply_text(AUTH_LOCKED_TEXT, parse_mode="Markdown")
+        return
     await send_paginated_opportunity(update, context, category="internship", page=0)
 
 async def cmd_favorites(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not check_user_auth(update, context):
+        await update.message.reply_text(AUTH_LOCKED_TEXT, parse_mode="Markdown")
+        return
     chat_id = str(update.effective_chat.id)
     favs = get_user_favorites(chat_id)
     if not favs:
@@ -198,6 +284,9 @@ async def cmd_favorites(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_paginated_opportunity(update, context, category="favorites", page=0)
 
 async def cmd_professors(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not check_user_auth(update, context):
+        await update.message.reply_text(AUTH_LOCKED_TEXT, parse_mode="Markdown")
+        return
     total = len(TOP_PROFESSORS_RADAR)
     prof = TOP_PROFESSORS_RADAR[0]
     card_text = format_professor_card(prof, current_idx=0, total_count=total)
@@ -205,6 +294,9 @@ async def cmd_professors(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(card_text, parse_mode="Markdown", reply_markup=keyboard, disable_web_page_preview=True)
 
 async def cmd_countries_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not check_user_auth(update, context):
+        await update.message.reply_text(AUTH_LOCKED_TEXT, parse_mode="Markdown")
+        return
     keyboard = [
         [InlineKeyboardButton("🇮🇹 إيطاليا (PoliTo / Eni / PoliMi)", callback_data="c:إيطاليا")],
         [InlineKeyboardButton("🇳🇴 النرويج (Equinor / NTNU / UiS)", callback_data="c:النرويج"),
@@ -222,6 +314,9 @@ async def cmd_countries_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
     )
 
 async def cmd_hunter_hub(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not check_user_auth(update, context):
+        await update.message.reply_text(AUTH_LOCKED_TEXT, parse_mode="Markdown")
+        return
     stats = get_latest_hunting_stats()
     scanned = stats.get("scanned_sources", len(HUNTING_TARGETS)) if stats else len(HUNTING_TARGETS)
     last_time = stats.get("timestamp", "اليوم") if stats else "اليوم"
@@ -234,7 +329,7 @@ async def cmd_hunter_hub(update: Update, context: ContextTypes.DEFAULT_TYPE):
 🏢 *البوابات الممسوحة:* {scanned} بوابة عالمية (Euraxess, Eni, SLB, Total, IFPEN, PoliTo, Leoben, TU Delft, KAUST...)
 📊 *إجمالي الفرص المصطادة:* {len(all_opps)} فرصة مؤكدة الروابط
 ⏱️ *آخر فحص وصيد نشط:* `{last_time}`
-🛡️ *معدل الروابط السليمة:* 100% (Zero 404 Engine)
+🛡️ *معدل الروابط السليمة:* 100% (Zero Dead Links)
 ━━━━━━━━━━━━━━━━━━━━━━
 💡 الصياد يراقب التحديثات لحظياً ويرسل إشعاراً فورياً للمشتركين عند اكتشاف أي فرصة جديدة تناسب ملفك.
 """
@@ -245,6 +340,9 @@ async def cmd_hunter_hub(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def cmd_search_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not check_user_auth(update, context):
+        await update.message.reply_text(AUTH_LOCKED_TEXT, parse_mode="Markdown")
+        return
     await update.message.reply_text(
         "🔍 *البحث الذكي المخصص:*\n\nأرسل في الشات أي كلمة تريد البحث عنها، مثل:\n• `multiphase`\n• `Eni`\n• `Torino`\n• `Leoben`\n• `CO2`\n• `عين صالح`\n• `تدريب`\n• `Norway`\n\nوسيقوم البوت بجلب كافة الفرص المطابقة وتصفحها بسلاسة!",
         parse_mode="Markdown"
@@ -253,6 +351,19 @@ async def cmd_search_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ----------------- معالج النصوص والبحث -----------------
 async def handle_user_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
+    chat_id = str(update.effective_chat.id)
+    user = update.effective_user
+    username = user.username if user else ""
+
+    # التحقق من إرسال رمز التفعيل الحصري كنص مباشر
+    if text == SECRET_ACCESS_TOKEN or text.startswith("/auth"):
+        await cmd_auth(update, context)
+        return
+
+    # فحص التصريح الأمني
+    if not is_user_authorized(chat_id, username):
+        await update.message.reply_text(AUTH_LOCKED_TEXT, parse_mode="Markdown")
+        return
 
     # التوجيه حسب الأزرار الثابتة
     if text == "🛢️ مكامن وتخزين جوفي (CCUS/H2)":
@@ -295,6 +406,12 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     chat_id = str(query.message.chat_id)
+    user = query.from_user
+    username = user.username if user else ""
+
+    if not is_user_authorized(chat_id, username):
+        await query.answer("🔒 الرادار مقفل - يرجى الدخول عبر رابط الدعوة الحصري", show_alert=True)
+        return
 
     # التنقل بين صفحات الفرص
     if data.startswith("page:"):
@@ -461,6 +578,8 @@ def main():
 
     # الأوامر النصية
     app.add_handler(CommandHandler("start", cmd_start))
+    app.add_handler(CommandHandler("auth", cmd_auth))
+    app.add_handler(CommandHandler("access", cmd_auth))
     app.add_handler(CommandHandler("help", cmd_start))
     app.add_handler(CommandHandler("reservoir", cmd_reservoir))
     app.add_handler(CommandHandler("fresh", cmd_no_exp))

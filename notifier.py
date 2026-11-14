@@ -58,19 +58,16 @@ def build_opportunity_keyboard(opp: Dict, category: str, page: int, total: int, 
         ]
     ]
 
-    # أزرار التنقل في الصفحات
+    # أزرار التنقل الدائري السلس بين الصفحات
     nav_buttons = []
-    if page > 0:
-        nav_buttons.append(InlineKeyboardButton("◀️ السابق", callback_data=f"page:{category}:{page-1}"))
+    if total > 1:
+        prev_page = (page - 1) % total
+        next_page = (page + 1) % total
+        nav_buttons.append(InlineKeyboardButton("◀️ السابق", callback_data=f"page:{category}:{prev_page}"))
+        nav_buttons.append(InlineKeyboardButton(f"📄 {page+1} / {total}", callback_data="noop"))
+        nav_buttons.append(InlineKeyboardButton("التالي ▶️", callback_data=f"page:{category}:{next_page}"))
     else:
-        nav_buttons.append(InlineKeyboardButton("⏹️ البداية", callback_data="noop"))
-
-    nav_buttons.append(InlineKeyboardButton(f"📄 {page+1} / {total}", callback_data="noop"))
-
-    if page < total - 1:
-        nav_buttons.append(InlineKeyboardButton("التالي ▶️", callback_data=f"page:{category}:{page+1}"))
-    else:
-        nav_buttons.append(InlineKeyboardButton("⏹️ النهاية", callback_data="noop"))
+        nav_buttons.append(InlineKeyboardButton("📄 1 / 1", callback_data="noop"))
 
     keyboard.append(nav_buttons)
     keyboard.append([InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="menu:main")])
@@ -102,17 +99,14 @@ def build_professor_keyboard(prof: Dict, page: int, total: int) -> InlineKeyboar
         [InlineKeyboardButton("✉️ توليد إيميل مخصص لهذا الأستاذ", callback_data=f"prof_mail:{page}")],
     ]
     nav_buttons = []
-    if page > 0:
-        nav_buttons.append(InlineKeyboardButton("◀️ السابق", callback_data=f"prof_page:{page-1}"))
+    if total > 1:
+        prev_page = (page - 1) % total
+        next_page = (page + 1) % total
+        nav_buttons.append(InlineKeyboardButton("◀️ السابق", callback_data=f"prof_page:{prev_page}"))
+        nav_buttons.append(InlineKeyboardButton(f"👨‍🏫 {page+1} / {total}", callback_data="noop"))
+        nav_buttons.append(InlineKeyboardButton("التالي ▶️", callback_data=f"prof_page:{next_page}"))
     else:
-        nav_buttons.append(InlineKeyboardButton("⏹️", callback_data="noop"))
-
-    nav_buttons.append(InlineKeyboardButton(f"👨‍🏫 {page+1} / {total}", callback_data="noop"))
-
-    if page < total - 1:
-        nav_buttons.append(InlineKeyboardButton("التالي ▶️", callback_data=f"prof_page:{page+1}"))
-    else:
-        nav_buttons.append(InlineKeyboardButton("⏹️", callback_data="noop"))
+        nav_buttons.append(InlineKeyboardButton("👨‍🏫 1 / 1", callback_data="noop"))
 
     keyboard.append(nav_buttons)
     keyboard.append([InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="menu:main")])

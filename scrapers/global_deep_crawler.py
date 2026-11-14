@@ -62,7 +62,7 @@ GLOBAL_COMPREHENSIVE_CATALOG: List[Dict] = [
         "monthly_salary": "1,000 € شهرياً (Rimborso spese) + وجبات ونقل مكوكي من ميلانو",
         "is_funded": "نعم (تربص مدفوع الأجر في مقرات Eni)",
         "seats": "6 أشهر (Tesi di Laurea in Azienda)",
-        "raw_link": "https://www.polito.it/didattica/dottorato-di-ricerca/ammissione-al-dottorato"
+        "raw_link": "https://www.eni.com/en-IT/careers/job-opportunities.html"
     },
     {
         "title": "Industrial Doctorate: Advanced Turbomachinery & Subsurface Gas Reinjection Systems",

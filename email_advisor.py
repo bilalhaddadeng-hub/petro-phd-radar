@@ -1,69 +1,83 @@
+# -*- coding: utf-8 -*-
+"""
+email_advisor.py
+Generates authentic, direct, human academic cold emails for Bilal Haddad.
+Written from the perspective of a focused gas/reservoir production engineer,
+avoiding generic AI filler clichés ("I hope this email finds you well", "privileged to contribute").
+"""
+
 def generate_bilal_cold_email(prof_name: str, institution: str, topic: str, lang: str = "en") -> str:
-    """
-    توليد بريد إلكتروني مخصص بنسبة 100% للمهندس بلال حداد يبرز نقاط القوة الخارقة في سيرته:
-    • ماستر غوبكين للغاز والمكثفات + ماستر جامعة كاتانيا بإيطاليا (نظام ECTS)
-    • خبرة ميدانية نوعية في شراكة سوناطراك وإيني (Association GSE) وحقل عين صالح
-    • نمذجة تدفق الموائع متعددة الأطوار وهندسة المكامن
-    """
+    # Clean topic and professor name
+    p_name = prof_name.replace("Prof. ", "").replace("Professor ", "").strip()
+    if not p_name or p_name == "[اسم الأستاذ]":
+        p_name = "Professor"
+
     if lang == "it":
         return f"""
-Gentile Prof. {prof_name},
+Oggetto: Candidatura Dottorato di Ricerca / Tesi Magistrale - Ingegneria dei Giacimenti e Flussi Multifase
 
-Le scrivo per manifestare il mio forte interesse per le attività di ricerca del Suo gruppo presso {institution}, con particolare riferimento all'ambito di {topic}.
+Gentile Prof. {p_name},
 
-Sono un ingegnere della produzione e giacimenti di gas (Laurea Magistrale conseguita presso la Gubkin Russian State University of Oil and Gas a Mosca con votazione 4.6/5.0) e attualmente sto completando un secondo percorso di Laurea Magistrale presso l'Università di Catania (sistema ECTS europeo). 
+Le scrivo direttamente per verificare se nel Suo gruppo di ricerca presso {institution} vi siano posizioni aperte per un Dottorato di Ricerca o un tirocinio per tesi magistrale nell'ambito di {topic}.
 
-Sul piano professionale, ho maturato esperienza diretta sul campo in Algeria, in particolare presso la joint venture Association GSE (SONATRACH–Eni) e nel giacimento di In Salah (SONATRACH), lavorando sull'analisi del comportamento di produzione dei pozzi di gas e sulla modellazione di flussi multifase (modelli di Turner e Lea).
+Ho conseguito la laurea magistrale in Progettazione e Sfruttamento dei Pozzi di Gas e Condensato presso la Gubkin University di Mosca con votazione 4.6/5.0. Il mio lavoro di tesi si è concentrato sulla modellazione dei flussi multifase (modelli di Turner e Lea) e sul liquid loading applicato ai pozzi del giacimento di In Salah in Algeria. Attualmente sto completando una seconda laurea magistrale in Ingegneria Chimica per la Sostenibilità Industriale presso l'Università di Catania (sistema ECTS).
 
-Sarei estremamente onorato di poter svolgere la mia tesi di laurea magistrale o candidarmi per una posizione di Dottorato di Ricerca (Ph.D. / borsa PNRR / borsa Eni) sotto la Sua supervisione. Data la mia regolare iscrizione universitaria in Italia, non è richiesta alcuna procedura di equivalenza o visto aggiuntivo per l'avvio immediato dell'attività.
+Sul piano pratico, ho maturato esperienza sul campo in Algeria presso la joint-venture Association GSE (SONATRACH–Eni) e con SONATRACH a In Salah, lavorando su monitoraggio pozzi, troubleshooting di produzione e dinamica di giacimento. 
 
-In allegato Le trasmetto il mio Curriculum Vitae dettagliato. Resto a Sua completa disposizione per un breve colloquio conoscitivo, anche online.
+I progetti del Suo gruppo sulla dinamica dei fluidi in mezzi porosi e lo stoccaggio geologico si collegano direttamente al mio percorso. Trovandomi già regolarmente iscritto in un ateneo italiano, l'avvio amministrativo (borse PNRR, borse industriali o contratti di ricerca) può avvenire immediatamente e senza procedure di equivalenza o visti.
 
-Cordiali saluti,
+Le allego il mio Curriculum Vitae. Qualora vi fosse una disponibilità, sarei lieto di svolgere un breve colloquio di 10-15 minuti su Teams per approfondire le opportunità.
+
+Un cordiale saluto,
+
 Bilal Haddad
-M.Sc. Candidate | University of Catania (Italy)
-Ex M.Sc. Gubkin University | Petroleum Production & Gas Engineer
-Telefono: +39 351 322 6758 | Email: bilalhaddadeng@gmail.com
+Ingegnere di Produzione Gas & Giacimenti | M.Sc. Università di Catania
+Cellulare: +39 351 322 6758 | Email: bilalhaddadeng@gmail.com
 LinkedIn: linkedin.com/in/haddadbilal
 """.strip()
+
     elif lang == "fr":
         return f"""
-Monsieur le Professeur {prof_name},
+Objet : Candidature Doctorat / Stage de recherche - Ingénierie des réservoirs et écoulements multiphasiques
 
-Actuellement étudiant en Master à l'Université de Catane en Italie, et titulaire d'un premier Master spécialisé en exploitation des puits de gaz et de condensat de l'Université d'État Gubkin du Pétrole et du Gaz de Moscou (mention 4.6/5.0), je me permets de vous contacter afin de vous soumettre ma candidature pour une thèse de doctorat ou un stage de recherche au sein de {institution}, sur la thématique de {topic}.
+Bonjour Monsieur le Professeur {p_name},
 
-Mon parcours combine une formation technique de pointe et une solide expérience opérationnelle sur le terrain en Algérie, notamment au sein de l'Association GSE (joint-venture SONATRACH–Eni) et sur le champ gazier d'In Salah. Mon travail de recherche a porté sur la modélisation des écoulements multiphasiques et l'optimisation de la production des puits de gaz.
+Je me permets de vous contacter directement afin de savoir si votre équipe au sein de {institution} dispose d'une opportunité de thèse de doctorat ou d'un stage de recherche orienté vers {topic}.
 
-Vos projets de recherche correspondent parfaitement à mon expertise en dynamique des réservoirs et écoulements en milieux poreux. Étant déjà inscrit dans le système universitaire italien (crédits ECTS européens), mon intégration académique et administrative est immédiate.
+Titulaire d'un premier Master en Exploitation des Puits de Gaz et Condensat de l'Université Gubkin à Moscou (mention 4.6/5.0), mon mémoire a porté sur la modélisation des écoulements multiphasiques (modèles de Turner et Lea) et la prédiction du liquid loading sur le champ gazier d'In Salah en Algérie. Je finalise actuellement un second Master à l'Université de Catane en Italie (cadre européen ECTS).
 
-Vous trouverez ci-joint mon Curriculum Vitae détaillé. Je reste à votre entière disposition pour un échange en visioconférence.
+Sur le plan opérationnel, j'ai effectué plusieurs stages de terrain en Algérie, notamment au sein de l'Association GSE (joint-venture SONATRACH–Eni) et à In Salah, travaillant sur l'analyse de production des puits et la dynamique des réservoirs.
 
-Veuillez agréer, Monsieur le Professeur, l'expression de mes salutations les plus distinguées.
+Vos axes de recherche sur les écoulements en milieux poreux et le stockage souterrain (CCUS / H2) correspondent exactement à mon profil technique. Étant déjà inscrit dans une université européenne en Italie, les démarches administratives et contractuelles sont directes et sans délai de visa.
+
+Mon CV est joint à ce message. Si une opportunité est envisageable, je reste disponible pour un bref échange en visioconférence à votre convenance.
+
+Bien cordialement,
 
 Bilal Haddad
 Ingénieur Production Pétrolière & Gaz | M.Sc. Université de Catane
 Tél : +39 351 322 6758 | Email : bilalhaddadeng@gmail.com
 LinkedIn : linkedin.com/in/haddadbilal
 """.strip()
+
     else: # English
         return f"""
-Subject: Prospective PhD / Research Opportunity: Inquiry regarding {topic} - Bilal Haddad
+Subject: PhD / Research inquiry: Multiphase Reservoir Dynamics & Subsurface Storage - Bilal Haddad
 
-Dear Professor {prof_name},
+Dear Professor {p_name},
 
-I hope this email finds you well.
+I am writing to inquire if you have an open PhD position or research internship in your group at {institution} for 2026/2027 focusing on {topic}.
 
-My name is Bilal Haddad, and I am writing to express my strong interest in joining your research group at {institution} as a PhD candidate or research intern focusing on {topic}.
+By way of background, I hold an M.Sc. in Gas & Condensate Well Exploitation from Gubkin Russian State University in Moscow (GPA 4.6/5.0). My thesis applied Turner and Lea multiphase flow models to predict liquid loading using field operational data from the In Salah gas field in Algeria. I am currently completing a second Master's in Chemical Engineering for Industrial Sustainability at the University of Catania in Italy (European ECTS framework).
 
-I hold an M.Sc. in the Design and Exploitation of Gas and Gas Condensate Wells from Gubkin Russian State University of Oil and Gas in Moscow (GPA: 4.6/5.0), where my thesis focused on multiphase flow modeling and liquid loading prediction in gas wells (In Salah Field, Algeria). Currently, I am completing a second Master's degree at the University of Catania in Italy (European ECTS framework).
+In addition to academic modeling, I have practical field experience from technical internships with Association GSE (the SONATRACH–Eni joint venture in Algeria) and SONATRACH at In Salah, working on gas well performance and production troubleshooting.
 
-Complementing my academic background, I have gained hands-on operational field experience in Algeria, including work with Association GSE (SONATRACH–Eni Joint Venture) and SONATRACH (In Salah Field), focusing on production troubleshooting and well performance optimization. 
+Your group's focus on multiphase flow in porous media and subsurface energy storage aligns directly with my technical background. Because I am currently enrolled in an Italian university within the EU framework, administrative onboarding and enrollment (via university fellowships, PNRR, or industrial agreements) can proceed smoothly without foreign degree recognition delays.
 
-Having followed your group's publications in reservoir engineering, multiphase fluid flow in porous media, and subsurface energy systems, I would be privileged to contribute to your ongoing research projects. Because I am currently based in Italy within the European university framework, I am eligible for immediate enrollment and funding frameworks without credential recognition delays.
+My CV is attached for your review. If there might be an opening in your lab, I would appreciate the opportunity for a brief 10–15 minute conversation on Teams or Zoom.
 
-I have attached my Curriculum Vitae for your review. Thank you very much for your time and consideration, and I welcome the opportunity to discuss any potential openings at your convenience.
+Best regards,
 
-Sincerely,
 Bilal Haddad
 Petroleum Production & Gas Engineer | M.Sc. Candidate, University of Catania (Italy)
 Phone: +39 351 322 6758 | Email: bilalhaddadeng@gmail.com

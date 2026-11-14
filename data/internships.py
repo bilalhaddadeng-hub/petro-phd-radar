@@ -14,7 +14,7 @@ RD_INTERNSHIPS_RADAR: List[Dict] = [
         "deadline": "2027-01-31 (لبدء التدريب في الربيع والصيف)",
         "leads_to_phd": "✅ بنسبة تزيد عن 85% يتحول المتدرب المتميز مباشرة إلى عقد دكتوراه وظيفي (CIFRE/IFPEN PhD) لثلاث سنوات إضافية.",
         "acceptance_difficulty": "🟢 سهلة جداً: تقبل طلبة الماستر الأوروبي (ECTS) مباشرة، واللغة الإنجليزية كافية تماماً داخل مخابر IFPEN.",
-        "link": "https://www.ifpenergiesnouvelles.com/carrieres/offres-demploi-et-de-stage"
+        "link": "https://theses.ifpen.fr/"
     },
     {
         "title": "Eni Curricular / Extra-Curricular Internship in Reservoir Geomodeling & CCUS",
@@ -26,7 +26,7 @@ RD_INTERNSHIPS_RADAR: List[Dict] = [
         "deadline": "مفتوح على مدار العام (Rolling Admissions)",
         "leads_to_phd": "✅ ترشيح فوري لمنح الدكتوراه الصناعية (Dottorato Executive PNRR) بين Eni وجامعتك في إيطاليا.",
         "acceptance_difficulty": "🟢 سهلة جداً ومثالية لك: أنت طالب في إيطاليا ولديك إقامة إيطالية، وتستطيع جامعتك توقيع اتفاقية التدريب (Convenzione di Tirocinio) في 48 ساعة دون أي تعقيد فيزا.",
-        "link": "https://www.eni.com/it-IT/carriere.html"
+        "link": "https://www.eni.com/en-IT/careers/job-opportunities.html"
     },
     {
         "title": "KAUST VSRP Fellowship: Deep Learning for 3D Reservoir Seismic & Flow Modeling",

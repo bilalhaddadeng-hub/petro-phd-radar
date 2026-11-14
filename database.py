@@ -68,8 +68,37 @@ def init_db():
         details TEXT
     )
     """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS authorized_users (
+        chat_id TEXT PRIMARY KEY,
+        username TEXT,
+        first_name TEXT,
+        authorized_at TEXT
+    )
+    """)
     conn.commit()
     conn.close()
+
+def authorize_user(chat_id: str, username: str = "", first_name: str = ""):
+    conn = get_connection()
+    cursor = conn.cursor()
+    now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    cursor.execute("""
+    INSERT OR REPLACE INTO authorized_users (chat_id, username, first_name, authorized_at)
+    VALUES (?, ?, ?, ?)
+    """, (str(chat_id), username, first_name, now_str))
+    conn.commit()
+    conn.close()
+
+def is_user_authorized(chat_id: str, username: str = "") -> bool:
+    if username and username.lower().strip().replace("@", "") in ["haddadbilal", "bilalhaddad", "bilalhaddadeng"]:
+        return True
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT 1 FROM authorized_users WHERE chat_id = ?", (str(chat_id),))
+    row = cursor.fetchone()
+    conn.close()
+    return row is not None
 
 def add_subscriber(chat_id: str, username: str = "", first_name: str = ""):
     conn = get_connection()
@@ -91,10 +120,15 @@ def get_subscribers() -> List[str]:
     return [r["chat_id"] for r in rows]
 
 def generate_id(link: str, title: str = "") -> str:
-    key = f"{link.strip()}::{title.strip()}"
+    import re
+    clean_title = re.sub(r'[^\w\s]', '', title).strip().lower()
+    clean_title = " ".join(clean_title.split())
+    # الاعتماد على العنوان المعياري لتوليد المعرف لضمان ثبات المعرف وعدم تكرار الفرص عند تحديث الروابط
+    key = clean_title if clean_title else link.strip().lower()
     return hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
 
 def save_or_update_opportunity(data: Dict) -> Tuple[str, bool]:
+    import re
     conn = get_connection()
     cursor = conn.cursor()
     title = data.get("title", "بدون عنوان")
@@ -102,8 +136,23 @@ def save_or_update_opportunity(data: Dict) -> Tuple[str, bool]:
     opp_id = generate_id(link, title)
     now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
 
-    cursor.execute("SELECT id, deadline, status FROM opportunities WHERE id = ?", (opp_id,))
+    # فحص مانع التكرار الصارم (البحث بالمعرف، أو العنوان المطابق، أو البداية المعيارية)
+    clean_title = re.sub(r'^[^\w]+', '', title).strip().lower()
+    cursor.execute("""
+    SELECT id, title, deadline, status FROM opportunities 
+    WHERE id = ? OR LOWER(title) = ?
+    """, (opp_id, title.strip().lower()))
     row = cursor.fetchone()
+
+    if row is None:
+        cursor.execute("SELECT id, title, deadline, status FROM opportunities")
+        all_rows = cursor.fetchall()
+        for r in all_rows:
+            r_norm = re.sub(r'^[^\w]+', '', r["title"]).strip().lower()
+            if len(clean_title) > 20 and len(r_norm) > 20:
+                if clean_title[:35] == r_norm[:35]:
+                    row = r
+                    break
 
     exp_req = data.get("experience_required", "0 سنوات (مفتوحة بالكامل لحديثي التخرج من الماستر / Early Stage Researcher)")
     category = data.get("category", "RESERVOIR_STORAGE")

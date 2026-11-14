@@ -17,7 +17,7 @@ CORPORATE_AND_INDUSTRIAL_PHD: List[Dict] = [
         "registration_fee": "0 €",
         "seats": "2 مقاعد مخصصة لمركز أبحاث ميلانو وسان دوناتو",
         "acceptance_difficulty": "🟢 سهلة جداً لملفك: Eni تعطي أولوية مطلقة للطلبة المقيمين في إيطاليا والدارسين في البوليتكنيك (PoliTo / PoliMi)، وتعتبر خطوة توظيف مباشر بعد الدكتوراه.",
-        "link": "https://www.eni.com/it-IT/carriere/formazione.html"
+        "link": "https://www.polito.it/en/education/phd-programmes/admissions-to-phd-programmes"
     },
     {
         "title": "CIFRE Industrial PhD Thesis: Reactive Multiphase Flow Simulation in Mature Carbonate Reservoirs",
@@ -47,7 +47,7 @@ CORPORATE_AND_INDUSTRIAL_PHD: List[Dict] = [
         "registration_fee": "0 €",
         "seats": "1 إلى 2 مقاعد سنوية للمختبرات الرقمية",
         "acceptance_difficulty": "🟡 متوسطة: تتطلب خلفية برمجية جيدة في بايثون أو C++ إلى جانب فهم متين لمعادلات تدفق المكامن (Darcy's Law ومسائل Navier-Stokes).",
-        "link": "https://careers.slb.com/early-careers/research-and-technology"
+        "link": "https://careers.slb.com/early-careers"
     },
     {
         "title": "Graduate R&D Doctoral Program: Subsurface Geomechanics & Depleted Gas Field Repurposing",

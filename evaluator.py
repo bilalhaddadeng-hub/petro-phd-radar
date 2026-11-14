@@ -142,3 +142,6 @@ def evaluate_for_bilal_haddad(country: str, institution: str, source_type: str, 
             "key_requirements": key_reqs,
             "analysis": f"{experience_note}\nفرصة ممولة مناسبة لحديثي التخرج تركز على هندسة المكامن وتخزين الطاقة الجوفية."
         }
+
+# Legacy alias for backward compatibility
+evaluate_for_algerian_in_italy = evaluate_for_bilal_haddad
