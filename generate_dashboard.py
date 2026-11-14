@@ -239,6 +239,12 @@ html_content = f"""<!DOCTYPE html>
                             </div>
                         </div>
 
+                        ${{o.key_requirements ? `
+                        <div style="background: rgba(245, 158, 11, 0.08); border-right: 3px solid #f59e0b; padding: 12px; border-radius: 8px; margin-bottom: 12px; font-size: 0.83rem; line-height: 1.5; color: #fde68a;">
+                            <div style="font-weight: 700; color: #fbbf24; margin-bottom: 4px;">⚠️ أصعب الشروط ونقاط الحسم (Deal-breakers):</div>
+                            <div>${{o.key_requirements.replace(/\\n/g, '<br>')}}</div>
+                        </div>` : ''}}
+
                         <div class="eval-box">
                             <div class="eval-title">📊 تقييم القبول لملفك (جزائري بماستر إيطالي)</div>
                             <div class="eval-text">${{o.acceptance_difficulty.replace(/\\n/g, '<br>')}}</div>

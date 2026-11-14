@@ -34,9 +34,14 @@ def init_db():
         notified_as_new INTEGER DEFAULT 0,
         notified_closing_soon INTEGER DEFAULT 0,
         experience_required TEXT,
-        category TEXT
+        category TEXT,
+        key_requirements TEXT
     )
     """)
+    cursor.execute("PRAGMA table_info(opportunities)")
+    cols = [r[1] for r in cursor.fetchall()]
+    if "key_requirements" not in cols:
+        cursor.execute("ALTER TABLE opportunities ADD COLUMN key_requirements TEXT")
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS subscribers (
         chat_id TEXT PRIMARY KEY,
@@ -102,6 +107,7 @@ def save_or_update_opportunity(data: Dict) -> Tuple[str, bool]:
 
     exp_req = data.get("experience_required", "0 سنوات (مفتوحة بالكامل لحديثي التخرج من الماستر / Early Stage Researcher)")
     category = data.get("category", "RESERVOIR_STORAGE")
+    key_reqs = data.get("key_requirements", "")
 
     if row is None:
         cursor.execute("""
@@ -109,8 +115,8 @@ def save_or_update_opportunity(data: Dict) -> Tuple[str, bool]:
             id, title, link, institution, country, source_type, sub_specialty,
             deadline, tuition_fee, registration_fee, monthly_salary, is_funded,
             seats, acceptance_difficulty, status, first_seen_at, last_updated_at,
-            notified_as_new, notified_closing_soon, experience_required, category
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NEW', ?, ?, 0, 0, ?, ?)
+            notified_as_new, notified_closing_soon, experience_required, category, key_requirements
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NEW', ?, ?, 0, 0, ?, ?, ?)
         """, (
             opp_id,
             title,
@@ -129,7 +135,8 @@ def save_or_update_opportunity(data: Dict) -> Tuple[str, bool]:
             now_str,
             now_str,
             exp_req,
-            category
+            category,
+            key_reqs
         ))
         conn.commit()
         conn.close()
@@ -158,7 +165,8 @@ def save_or_update_opportunity(data: Dict) -> Tuple[str, bool]:
             seats = ?,
             acceptance_difficulty = ?,
             experience_required = ?,
-            category = ?
+            category = ?,
+            key_requirements = ?
         WHERE id = ?
         """, (
             title,
@@ -177,6 +185,7 @@ def save_or_update_opportunity(data: Dict) -> Tuple[str, bool]:
             data.get("acceptance_difficulty", "متوسطة"),
             exp_req,
             category,
+            key_reqs,
             existing_id
         ))
         conn.commit()

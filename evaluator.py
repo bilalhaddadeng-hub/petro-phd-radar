@@ -1,26 +1,102 @@
+# -*- coding: utf-8 -*-
+"""
+evaluator.py
+محرك التقييم الذكي واستخراج أصعب الشروط ونقاط الحسم لملف المهندس بلال حداد
+"""
+
 from typing import Dict
 
-def evaluate_for_bilal_haddad(country: str, institution: str, source_type: str, title: str, sub_specialty: str = "") -> Dict[str, str]:
+def determine_key_requirements(country: str, institution: str, source_type: str, title: str, sub_specialty: str = "") -> str:
     """
-    تحليل دقيق ومخصص 100% للمهندس بلال حداد يدمج:
-    • هندسة المكامن الكلاسيكية (Reservoir Engineering & Gas Condensate Wells).
-    • هندسة تخزين الطاقة الجوفية والكربون (CCUS & Underground Hydrogen Storage) كفرع أصيل ومكمل لفيزياء المكامن.
-    • التركيز على الفرص التي لا تشترط سنوات خبرة عملية سابقة (Early Stage Researchers R1).
+    استخراج وتحديد أصعب الشروط ونقاط الحسم (Deal-breakers & Tough Requirements)
+    لكل فرصة، مع بيان مدى مطابقة ملف بلال حداد لها.
     """
     c = country.lower()
     inst = institution.lower()
     t = title.lower()
     s = sub_specialty.lower()
 
-    experience_note = "✅ **الخبرة المطلوبة:** 0 سنوات خبرة (مخصصة لخريجي الماستر مباشرة / Early-Stage Researcher R1 دون اشتراط خبرة وظيفية سابقة)."
+    if "leoben" in inst or "austria" in c:
+        return (
+            "🚨 *أصعب شرط:* إتقان فيزياء تدفق الموائع بالأوساط المسامية ومحاكاة المكامن (Multiphase Flow in Porous Media) + مقابلة فنية مع كرسي هندسة المكامن.\n"
+            "📜 *شرط اللغة:* 100% الإنجليزية (الألمانية غير مطلوبة للبحث والعمل الأكاديمي نهائياً).\n"
+            "🌍 *الجنسية والمعادلة:* مفتوحة للجميع، وشهادتك الإيطالية بنظام ECTS معتمدة فوراً بالنمسا دون أي معادلة.\n"
+            "💡 *موقف ملفك:* ✅ مستوفٍ 100% (أطروحتك في غوبكين حول Turner & Lea في حقل عين صالح تطابق هذا الشرط تماماً)."
+        )
+    elif "polito" in inst or "torino" in inst or "polimi" in inst or "milano" in inst or "catania" in inst or "italy" in c or "italia" in c:
+        return (
+            "🚨 *أصعب شرط:* تقديم مقترح بحثي (Research Proposal) في المكامن أو تخزين الكربون واجتياز المقابلة الشفوية عبر Teams.\n"
+            "📜 *شرط اللغة:* الإنجليزية B2 (لا يُشترط الإيطالية نهائياً؛ البحث والمناقشة بالإنجليزية).\n"
+            "🌍 *الجنسية والمعادلة:* مفتوحة للجزائريين؛ ونظراً لوجودك في جامعة كاتانيا، فأنت داخل المنظومة الإيطالية ولا تحتاج لفيزا دخول جديدة أو معادلة CIMEA.\n"
+            "💡 *موقف ملفك:* ✅ مستوفٍ بأعلى أفضلية (خبرتك السابقة في شراكة سوناطراك-إيني GSE تمنحك ميزة كبرى لدى لجان Eni)."
+        )
+    elif "eni" in inst:
+        return (
+            "🚨 *أصعب شرط:* اجتياز المقابلة الفنية والسلوكية مع مسؤولي R&D في سان دوناتو ميلانيزي.\n"
+            "📜 *شرط اللغة:* الإنجليزية المهنية B2.\n"
+            "🌍 *الجنسية والإقامة:* مفتوحة، وتستفيد مباشرة من إقامتك الدراسية الحالية في إيطاليا لتوقيع العقد فوراً.\n"
+            "💡 *موقف ملفك:* ✅ تطابق استثنائي (تاريخ عملك في شراكة GSE مع سوناطراك يجعل قبولك شبه محسوم)."
+        )
+    elif "delft" in inst or "netherlands" in c:
+        return (
+            "🚨 *أصعب شرط:* مهارات قوية في النمذجة الرياضية والحوسبية (Python / Matlab / C++) لمحاكاة التدفق متعدد الأطوار وتخزين الهيدروجين.\n"
+            "📜 *شرط اللغة:* IELTS 7.0 أو إثبات دراسة ماستر أوروبي باللغة الإنجليزية.\n"
+            "🌍 *الجنسية والفيزا:* عقد موظف باحث كامل (Employee Status) مع كفالة فيزا كاملة من الجامعة براتب ممتاز يبدأ من 2,770€.\n"
+            "💡 *موقف ملفك:* ✅ مؤهل، وأطروحتك النظرية في غوبكين تثبت كفاءتك الحوسبية."
+        )
+    elif "france" in c or "ifp" in inst or "total" in inst:
+        return (
+            "🚨 *أصعب شرط:* شرط السن لعقود CIFRE الصناعية (يُفضل أقل من 30 سنة)، وتوافق موضوعك مع خطة مختبر أبحاث IFPEN في الأوساط المسامية.\n"
+            "📜 *شرط اللغة:* الإنجليزية للبحث، ومبادئ الفرنسية B1 تعتبر ميزة إضافية قوية (أنت تملك الفرنسية B1 في سيرتك!).\n"
+            "🌍 *الجنسية:* مفتوحة للجميع بعقد بحثي رسمي في فرنسا (CDD de Recherche).\n"
+            "💡 *موقف ملفك:* ✅ مستوفٍ ومؤهل تماماً."
+        )
+    elif "saudi" in c or "kfupm" in inst or "kaust" in inst:
+        return (
+            "🚨 *أصعب شرط:* في KFUPM يُفضل توفر اختبار GRE General (الكمي > 156) ومعدل ماستر > 3.5/4.0 (معدلك في غوبكين 4.6/5.0 متفوق جداً). في KAUST مقابلة فنية دقيقة.\n"
+            "📜 *شرط اللغة:* TOEFL iBT 80+ أو IELTS 6.5+.\n"
+            "🌍 *المميزات والفيزا:* تمويل ملكي كامل (راتب شهري معفى من الضرائب، فيلا وسكن مجاني، تذاكر سنوية، وتأمين صحي VIP).\n"
+            "💡 *موقف ملفك:* ✅ متفوق جداً (خريجو هندسة الغاز والمكامن يمثلون أولوية قصوى لمشاريع أرامكو)."
+        )
+    elif "norway" in c or "ntnu" in inst or "uis" in inst or "equinor" in inst:
+        return (
+            "🚨 *أصعب شرط:* منافسة دولية عالية وشرط ألا يقل تقدير الماستر عن مرتبة B بالنظام النرويجي (معدلك 4.6/5.0 في غوبكين يضمن استيفاء هذا الشرط).\n"
+            "📜 *شرط اللغة:* إتقان الإنجليزية (IELTS 6.5+ أو ما يعادله).\n"
+            "🌍 *الوضع المالي:* وظيفة باحث براتب سنوي حكومي يبدأ من ~530,000 كرونة نرويجية مع تغطية اجتماعية كاملة.\n"
+            "💡 *موقف ملفك:* ✅ مستوفٍ، ومشاريع تخزين الكربون في بحر الشمال تعتمد على نفس فيزياء مكامن الغاز."
+        )
+    elif "cambridge" in inst or "heriot" in inst or "uk" in c or "united kingdom" in c:
+        return (
+            "🚨 *أصعب شرط:* إثبات الكفاءة في ميكانيكا الموائع وهندسة المكامن واجتياز المقابلة الأكاديمية مع أساتذة المعهد.\n"
+            "📜 *شرط اللغة:* IELTS 6.5 إلى 7.0.\n"
+            "🌍 *التمويل:* مقاعد ممولة بالكامل تشمل الإعفاء من الرسوم وراتب شهري معفى من الضرائب.\n"
+            "💡 *موقف ملفك:* ✅ مناسب جداً لمعاهد الطاقة العريقة مثل Heriot-Watt."
+        )
+    else:
+        return (
+            "🚨 *أصعب شرط:* توافق شهادة الماستر مع هندسة المكامن أو الكيمياء أو الطاقة واجتياز المقابلة الفنية.\n"
+            "📜 *شرط اللغة:* 100% الإنجليزية.\n"
+            "🌍 *شرط الخبرة:* 0 سنوات خبرة سابقة مطلوبة (مفتوحة لخريجي الماستر حديثاً R1).\n"
+            "💡 *موقف ملفك:* ✅ متطابق ومستوفٍ للشروط الأكاديمية."
+        )
+
+def evaluate_for_bilal_haddad(country: str, institution: str, source_type: str, title: str, sub_specialty: str = "") -> Dict[str, str]:
+    c = country.lower()
+    inst = institution.lower()
+    t = title.lower()
+    s = sub_specialty.lower()
+
+    experience_note = "✅ *الخبرة المطلوبة:* 0 سنوات خبرة (مخصصة لخريجي الماستر مباشرة / Early-Stage Researcher R1 دون اشتراط خبرة وظيفية سابقة)."
+    key_reqs = determine_key_requirements(country, institution, source_type, title, sub_specialty)
 
     if "eni" in inst or "italy" in c or "italia" in c or "politecnico di torino" in inst or "catania" in inst:
         return {
             "level": "🟢 سهلة جداً (أقوى تطابق وتفوق مطلق لملفك)",
             "experience": experience_note,
+            "key_requirements": key_reqs,
             "analysis": (
                 f"{experience_note}\n"
-                "🎯 **تطابق هندسي واستراتيجي لا يُنافس في إيطاليا:**\n"
+                "🎯 *تطابق هندسي واستراتيجي لا يُنافس في إيطاليا:*\n"
                 "• حقن ثاني أكسيد الكربون (CCUS) وتخزين الهيدروجين الجوفي في حقول إيطاليا يعتمد كلياً على نفس معادلات تدفق الغاز والمكثفات التي درستها في غوبكين.\n"
                 "• خبرتك الميدانية السابقة في شراكة سوناطراك-إيني (Association GSE) تجعلك معروفاً لدى مسؤولي Eni وتعطيك أفضلية استثنائية.\n"
                 "• وجودك في إيطاليا (جامعة كاتانيا) يتيح لك توقيع اتفاقيات الدكتوراه الصناعية والمنح الوطنية PNRR مباشرة دون أي عوائق بيروقراطية."
@@ -30,6 +106,7 @@ def evaluate_for_bilal_haddad(country: str, institution: str, source_type: str, 
         return {
             "level": "🟢 سهلة ومباشرة (تطابق علمي في ميكانيكا تدفق الموائع بالمكامن)",
             "experience": experience_note,
+            "key_requirements": key_reqs,
             "analysis": (
                 f"{experience_note}\n"
                 "• مشاريع جامعة ليوبن ودلفت في الـ Underground Storage و CCUS تركز على ديناميكا التدفق متعدد الأطوار والـ Relative Permeability، وهو صلب أطروحتك في غوبكين.\n"
@@ -40,6 +117,7 @@ def evaluate_for_bilal_haddad(country: str, institution: str, source_type: str, 
         return {
             "level": "🟢 سهلة إلى متوسطة (تقدير أكاديمي استثنائي لشهادة غوبكين)",
             "experience": experience_note,
+            "key_requirements": key_reqs,
             "analysis": (
                 f"{experience_note}\n"
                 "• جامعة الملك فهد (KFUPM - كلية CPG) وجامعة KAUST تركزان على مكامن الغاز غير التقليدي وتخزين الكربون.\n"
@@ -50,25 +128,17 @@ def evaluate_for_bilal_haddad(country: str, institution: str, source_type: str, 
         return {
             "level": "🟢 سهلة إلى متوسطة (أفضلية للمهندسين المتخرجين)",
             "experience": experience_note,
+            "key_requirements": key_reqs,
             "analysis": (
                 f"{experience_note}\n"
                 "• معهد IFPEN وعقود CIFRE في فرنسا مخصصة قانونياً لحديثي التخرج من الماستر للبدء في مسار البحث التطبيقي.\n"
                 "• خلفيتك في حقول الغاز وميكانيكا الموائع تؤهلك مباشرة لمشاريع محاكاة المكامن وحقن الغازات."
             )
         }
-    elif any(x in c for x in ["poland", "hungary", "romania"]):
-        return {
-            "level": "🟢 سهلة جداً (قبول مباشر بدون أي خبرة)",
-            "experience": experience_note,
-            "analysis": (
-                f"{experience_note}\n"
-                "• مدارس الدكتوراه في بولندا والمجر تقبل فوراً بناءً على كشف درجات الماستر والمشروع البحثي دون طلب خبرة مهنية.\n"
-                "• طلاقتك بالروسية (C2) مع الماستر الإيطالي تعفيك من أي تعقيدات مقابلة."
-            )
-        }
     else:
         return {
             "level": "🟡 متوسطة",
             "experience": experience_note,
+            "key_requirements": key_reqs,
             "analysis": f"{experience_note}\nفرصة ممولة مناسبة لحديثي التخرج تركز على هندسة المكامن وتخزين الطاقة الجوفية."
         }

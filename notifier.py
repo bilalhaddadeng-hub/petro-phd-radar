@@ -15,6 +15,9 @@ def format_opportunity_card(opp: Dict, tag: str = "", current_idx: int = 0, tota
     pagination_str = f" [{current_idx + 1} من {total_count}]" if total_count > 0 else ""
     header_tag = f"【 {tag}{pagination_str} 】\n" if tag or pagination_str else ""
 
+    key_reqs = opp.get("key_requirements", "")
+    reqs_block = f"\n⚠️ *أصعب الشروط ونقاط الحسم:*\n{key_reqs}\n" if key_reqs else ""
+
     card = f"""
 {header_tag}🛢️ *{opp['title']}*
 {source_emoji} | 📍 *الجهة:* {opp['institution']} ({opp['country']})
@@ -27,8 +30,8 @@ def format_opportunity_card(opp: Dict, tag: str = "", current_idx: int = 0, tota
 👥 *6. عدد المقاعد:* {opp['seats']}
 📅 *تاريخ الإغلاق:* {opp.get('deadline', 'مفتوح حتى ملء الشواغر')}
 💼 *الخبرة المطلوبة:* 0 سنوات (مفتوحة لحديثي التخرج من الماستر R1)
-
-📊 *7. تقييم القبول لملف بلال حداد:*
+{reqs_block}
+📊 *تقييم القبول لملف بلال حداد:*
 {opp['acceptance_difficulty']}
 ━━━━━━━━━━━━━━━━━━━━━━
 """

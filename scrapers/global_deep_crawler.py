@@ -358,7 +358,8 @@ def verify_single_catalog_item(opp: Dict) -> Dict:
         "seats": opp["seats"],
         "acceptance_difficulty": f"{eval_res['level']}\n{eval_res['analysis']}",
         "experience_required": "0 سنوات (مفتوحة بالكامل لحديثي التخرج من الماستر / Early Stage Researcher)",
-        "category": "RESERVOIR_STORAGE"
+        "category": "RESERVOIR_STORAGE",
+        "key_requirements": eval_res.get("key_requirements", "")
     }
 
 def crawl_and_verify_all_opportunities() -> List[Dict]:
