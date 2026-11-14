@@ -2,11 +2,15 @@ import sqlite3
 import hashlib
 from datetime import datetime, date
 from typing import List, Dict, Optional, Tuple
-from config import DB_PATH, CLOSING_SOON_DAYS
+from config import DB_PATH, CLOSING_SOON_DAYS, OWNER_CHAT_IDS, AUTHORIZED_USERNAMES
 
 def get_connection():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=15)
     conn.row_factory = sqlite3.Row
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+    except sqlite3.DatabaseError:
+        pass
     return conn
 
 def init_db():
@@ -82,6 +86,18 @@ def init_db():
         authorized_at TEXT
     )
     """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS applications (
+        chat_id TEXT NOT NULL,
+        opp_id TEXT NOT NULL,
+        status TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (chat_id, opp_id)
+    )
+    """)
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_opp_status ON opportunities(status)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_opp_deadline ON opportunities(deadline)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_fav_chat ON favorites(chat_id)")
     conn.commit()
     conn.close()
 
@@ -97,7 +113,9 @@ def authorize_user(chat_id: str, username: str = "", first_name: str = ""):
     conn.close()
 
 def is_user_authorized(chat_id: str, username: str = "") -> bool:
-    if username and username.lower().strip().replace("@", "") in ["haddadbilal", "bilalhaddad", "bilalhaddadeng"]:
+    if str(chat_id) in OWNER_CHAT_IDS:
+        return True
+    if username and username.lower().strip().replace("@", "") in AUTHORIZED_USERNAMES:
         return True
     conn = get_connection()
     cursor = conn.cursor()
@@ -428,3 +446,94 @@ def mark_as_notified_closing(opp_ids: List[str]):
     cursor.executemany("UPDATE opportunities SET notified_closing_soon = 1, status = 'CLOSING_SOON' WHERE id = ?", [(i,) for i in opp_ids])
     conn.commit()
     conn.close()
+
+
+# ----------------- متابعة التقديمات (Application Tracker) -----------------
+APP_STATUSES = ["APPLIED", "INTERVIEW", "OFFER", "REJECTED"]
+
+def get_application_status(chat_id: str, opp_id: str) -> Optional[str]:
+    conn = get_connection()
+    row = conn.execute("SELECT status FROM applications WHERE chat_id = ? AND opp_id = ?", (str(chat_id), opp_id)).fetchone()
+    conn.close()
+    return row["status"] if row else None
+
+def cycle_application_status(chat_id: str, opp_id: str) -> Optional[str]:
+    """none -> APPLIED -> INTERVIEW -> OFFER -> REJECTED -> none. يرجع الحالة الجديدة."""
+    cur = get_application_status(chat_id, opp_id)
+    order = [None] + APP_STATUSES
+    new = order[(order.index(cur) + 1) % len(order)]
+    conn = get_connection()
+    if new is None:
+        conn.execute("DELETE FROM applications WHERE chat_id = ? AND opp_id = ?", (str(chat_id), opp_id))
+    else:
+        now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        conn.execute("INSERT OR REPLACE INTO applications (chat_id, opp_id, status, updated_at) VALUES (?, ?, ?, ?)",
+                     (str(chat_id), opp_id, new, now_str))
+    conn.commit()
+    conn.close()
+    return new
+
+def get_user_applications(chat_id: str) -> List[Dict]:
+    conn = get_connection()
+    rows = conn.execute("""
+    SELECT o.*, a.status AS app_status FROM opportunities o
+    JOIN applications a ON o.id = a.opp_id
+    WHERE a.chat_id = ? ORDER BY a.updated_at DESC
+    """, (str(chat_id),)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+# ----------------- المواعيد والإحصاءات -----------------
+def _days_left(deadline: str) -> Optional[int]:
+    if not deadline or len(deadline) < 10:
+        return None
+    try:
+        return (datetime.strptime(deadline[:10], "%Y-%m-%d").date() - date.today()).days
+    except ValueError:
+        return None
+
+def get_upcoming_deadlines(days: int = 30) -> List[Dict]:
+    """الفرص المفتوحة التي تغلق خلال `days` يوماً، مرتبة بالأقرب."""
+    out = []
+    for o in get_all_active_open():
+        d = _days_left(o.get("deadline"))
+        if d is not None and 0 <= d <= days:
+            o["days_left"] = d
+            out.append(o)
+    return sorted(out, key=lambda x: x["days_left"])
+
+def close_expired_opportunities() -> int:
+    """تعليم الفرص التي انتهى موعدها بـ CLOSED. يرجع عددها."""
+    expired = [o["id"] for o in get_all_active_open() if (_days_left(o.get("deadline")) or 0) < 0
+               and _days_left(o.get("deadline")) is not None]
+    if expired:
+        conn = get_connection()
+        conn.executemany("UPDATE opportunities SET status = 'CLOSED' WHERE id = ?", [(i,) for i in expired])
+        conn.commit()
+        conn.close()
+    return len(expired)
+
+def get_stats() -> Dict:
+    conn = get_connection()
+    total = conn.execute("SELECT COUNT(*) c FROM opportunities WHERE status != 'CLOSED'").fetchone()["c"]
+    by_country = conn.execute("SELECT country, COUNT(*) c FROM opportunities WHERE status != 'CLOSED' GROUP BY country ORDER BY c DESC LIMIT 8").fetchall()
+    by_type = conn.execute("SELECT source_type, COUNT(*) c FROM opportunities WHERE status != 'CLOSED' GROUP BY source_type ORDER BY c DESC").fetchall()
+    conn.close()
+    return {"total": total, "by_country": [(r[0], r[1]) for r in by_country], "by_type": [(r[0], r[1]) for r in by_type]}
+
+def get_favorite_reminders(days_set) -> List[Tuple[str, Dict]]:
+    """(chat_id, opp) للمفضلة والتقديمات النشطة التي يتبقى لإغلاقها عدد أيام ضمن days_set."""
+    conn = get_connection()
+    rows = conn.execute("""
+    SELECT f.chat_id AS chat_id, o.* FROM favorites f JOIN opportunities o ON o.id = f.opp_id
+    WHERE o.status != 'CLOSED'
+    """).fetchall()
+    conn.close()
+    seen, out = set(), []
+    for r in rows:
+        d = _days_left(r["deadline"])
+        if d in days_set and (r["chat_id"], r["id"]) not in seen:
+            seen.add((r["chat_id"], r["id"]))
+            o = dict(r); o["days_left"] = d
+            out.append((r["chat_id"], o))
+    return out

@@ -5,6 +5,7 @@ bot.py - رادار وصياد دكتوراه وتدريب هندسة البتر
 يدعم التصفح التفاعلي بالأزرار (Pagination)، صيد الفرص الحي، فحص الروابط 100%، وتوليد الإيميلات.
 """
 
+import hmac
 import logging
 import asyncio
 from datetime import datetime
@@ -24,11 +25,19 @@ from telegram.ext import (
     filters
 )
 
+import csv
+import hashlib
+import io
+from telegram import BotCommand
+from telegram.error import BadRequest
+
 from config import (
-    TELEGRAM_BOT_TOKEN,
+    require_token,
     TELEGRAM_CHAT_ID,
     DAILY_REPORT_HOUR,
-    DAILY_REPORT_MINUTE
+    DAILY_REPORT_MINUTE,
+    SECRET_ACCESS_TOKEN,
+    REMINDER_DAYS
 )
 from database import (
     init_db,
@@ -52,7 +61,14 @@ from database import (
     get_closing_soon_opportunities,
     mark_as_notified_closing,
     authorize_user,
-    is_user_authorized
+    is_user_authorized,
+    cycle_application_status,
+    get_application_status,
+    get_user_applications,
+    get_upcoming_deadlines,
+    close_expired_opportunities,
+    get_stats,
+    get_favorite_reminders
 )
 from hunter import execute_deep_hunt, HUNTING_TARGETS
 from data.professors import TOP_PROFESSORS_RADAR
@@ -81,8 +97,37 @@ MAIN_KEYBOARD = [
 ]
 REPLY_MARKUP = ReplyKeyboardMarkup(MAIN_KEYBOARD, resize_keyboard=True)
 
-# ذاكرة الجلسة لتخزين قوائم البحث والتصفح حسب المستخدم
-USER_CACHE = {}
+# حد callback_data في تيليجرام هو 64 بايت: نختصر التصنيفات الطويلة (كالبحث) إلى مفتاح قصير
+CATEGORY_KEYS = {}
+
+def cat_key(category: str) -> str:
+    if len(category.encode("utf-8")) <= 20:
+        return category
+    key = "h_" + hashlib.sha1(category.encode("utf-8")).hexdigest()[:8]
+    CATEGORY_KEYS[key] = category
+    return key
+
+def resolve_cat(key: str) -> str:
+    return CATEGORY_KEYS.get(key, key if not key.startswith("h_") else "no_exp")
+
+async def safe_edit(query, text, **kw):
+    try:
+        await query.edit_message_text(text=text, **kw)
+    except BadRequest as e:
+        if "not modified" in str(e).lower():
+            return
+        kw.pop("parse_mode", None)  # فشل Markdown (رموز خاصة): أعد المحاولة كنص عادي
+        try:
+            await query.edit_message_text(text=text.replace("*", "").replace("`", ""), **kw)
+        except BadRequest as e2:
+            logger.debug(f"Edit skipped: {e2}")
+
+async def safe_send(bot, chat_id, text, **kw):
+    try:
+        return await bot.send_message(chat_id=chat_id, text=text, **kw)
+    except BadRequest:
+        kw.pop("parse_mode", None)
+        return await bot.send_message(chat_id=chat_id, text=text.replace("*", "").replace("`", ""), **kw)
 
 def get_category_items(category: str, chat_id: str) -> list:
     if category == "reservoir_storage":
@@ -112,52 +157,36 @@ async def send_paginated_opportunity(update: Update, context: ContextTypes.DEFAU
     if not items:
         empty_text = "❌ لا توجد فرص متطابقة حالياً ضمن هذا القسم."
         if is_edit and update.callback_query:
-            await update.callback_query.edit_message_text(empty_text)
+            await safe_edit(update.callback_query, empty_text)
         else:
             await context.bot.send_message(chat_id=chat_id, text=empty_text)
         return
 
-    # ضبط رقم الصفحة ضمن الحدود
     total = len(items)
     page = max(0, min(page, total - 1))
     opp = items[page]
     fav_status = is_favorite(chat_id, opp["id"])
+    app_status = get_application_status(chat_id, opp["id"])
 
     card_text = format_opportunity_card(opp, current_idx=page, total_count=total)
-    keyboard = build_opportunity_keyboard(opp, category=category, page=page, total=total, is_fav=fav_status)
+    if app_status:
+        card_text += f"\n📌 *حالة تقديمك:* {app_status}"
+    keyboard = build_opportunity_keyboard(opp, category=cat_key(category), page=page, total=total,
+                                          is_fav=fav_status, app_status=app_status)
 
     if is_edit and update.callback_query:
-        try:
-            await update.callback_query.edit_message_text(
-                text=card_text,
-                parse_mode="Markdown",
-                reply_markup=keyboard,
-                disable_web_page_preview=True
-            )
-        except Exception as e:
-            logger.debug(f"Edit message skipped: {e}")
+        await safe_edit(update.callback_query, card_text, parse_mode="Markdown",
+                        reply_markup=keyboard, disable_web_page_preview=True)
     else:
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text=card_text,
-            parse_mode="Markdown",
-            reply_markup=keyboard,
-            disable_web_page_preview=True
-        )
+        await safe_send(context.bot, chat_id, card_text, parse_mode="Markdown",
+                        reply_markup=keyboard, disable_web_page_preview=True)
 
 # الرمز السري الحصري للوصول للبوت (خاص بالمهندس بلال حداد فقط)
-SECRET_ACCESS_TOKEN = "bilal_petro_vip"
 
 AUTH_LOCKED_TEXT = """
 🔒 *عذراً، هذا الرادار مخصص وخاص.*
 
-هذا البوت مخصص حصرياً للمهندس *بلال حداد* (Bilal Haddad) لمتابعة واقتناص فرص الدكتوراه والتربصات المتقدمة في هندسة المكامن والبترول والطاقة الجوفية.
-
-إذا كنت صاحب الرادار وتستخدم حساباً جديداً، يرجى الدخول عبر رابط الدعوة الحصري:
-🔗 `https://t.me/bilal_petro_phd_bot?start=bilal_petro_vip`
-
-أو إرسال رمز التفعيل الخاص مباشرة في المحادثة:
-`/auth bilal_petro_vip`
+هذا البوت مخصص لمالكه فقط. إن كنت المالك فاستخدم رابط الدعوة الخاص بك أو أرسل `/auth <الرمز>`.
 """
 
 def check_user_auth(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
@@ -169,8 +198,8 @@ def check_user_auth(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     username = user.username if user else ""
     first_name = user.first_name if user else ""
 
-    # التحقق من باراميتر البدء في الرابط العميق: /start bilal_petro_vip
-    if context.args and len(context.args) > 0 and context.args[0].strip() == SECRET_ACCESS_TOKEN:
+    # التحقق من باراميتر البدء في الرابط العميق: /start <secret>
+    if context.args and len(context.args) > 0 and SECRET_ACCESS_TOKEN and hmac.compare_digest(context.args[0].strip(), SECRET_ACCESS_TOKEN):
         authorize_user(chat_id, username, first_name)
         return True
 
@@ -190,10 +219,10 @@ async def cmd_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     token = context.args[0].strip() if context.args else ""
     text = update.message.text.strip() if update.message and update.message.text else ""
-    if not token and SECRET_ACCESS_TOKEN in text:
+    if SECRET_ACCESS_TOKEN and not token and SECRET_ACCESS_TOKEN in text:
         token = SECRET_ACCESS_TOKEN
 
-    if token == SECRET_ACCESS_TOKEN:
+    if SECRET_ACCESS_TOKEN and hmac.compare_digest(token, SECRET_ACCESS_TOKEN):
         authorize_user(chat_id, username, first_name)
         await update.message.reply_text(
             f"🔓 *تم التحقق بنجاح وتفعيل وصولك الحصري يا مهندس {first_name or 'بلال'}!*\n\nأهلاً بك في رادارك الخاص لصيد دكتوراه هندسة البترول والمكامن.",
@@ -203,7 +232,7 @@ async def cmd_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await cmd_start(update, context)
     else:
         await update.message.reply_text(
-            "❌ رمز الدخول غير صحيح. يرجى إدخال الرمز الصحيح عبر:\n`/auth bilal_petro_vip`",
+            "❌ رمز الدخول غير صحيح.",
             parse_mode="Markdown"
         )
 
@@ -357,7 +386,7 @@ async def handle_user_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = user.username if user else ""
 
     # التحقق من إرسال رمز التفعيل الحصري كنص مباشر
-    if text == SECRET_ACCESS_TOKEN or text.startswith("/auth"):
+    if (SECRET_ACCESS_TOKEN and text == SECRET_ACCESS_TOKEN) or text.startswith("/auth"):
         await cmd_auth(update, context)
         return
 
@@ -417,19 +446,30 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # التنقل بين صفحات الفرص
     if data.startswith("page:"):
         _, category, page_str = data.split(":", 2)
+        category = resolve_cat(category)
         await send_paginated_opportunity(update, context, category=category, page=int(page_str), is_edit=True)
 
     # المفضلة
     elif data.startswith("fav:"):
         _, opp_id, category, page_str = data.split(":", 3)
+        category = resolve_cat(category)
         add_favorite(chat_id, opp_id)
         await query.answer("⭐ تم حفظ الفرصة في المفضلة!", show_alert=False)
         await send_paginated_opportunity(update, context, category=category, page=int(page_str), is_edit=True)
 
     elif data.startswith("unfav:"):
         _, opp_id, category, page_str = data.split(":", 3)
+        category = resolve_cat(category)
         remove_favorite(chat_id, opp_id)
         await query.answer("❌ تم الحذف من المفضلة", show_alert=False)
+        await send_paginated_opportunity(update, context, category=category, page=int(page_str), is_edit=True)
+
+    # تتبع حالة التقديم
+    elif data.startswith("trk:"):
+        _, opp_id, category, page_str = data.split(":", 3)
+        category = resolve_cat(category)
+        new = cycle_application_status(chat_id, opp_id)
+        await query.answer(f"📌 الحالة: {new or 'أُزيل التتبع'}", show_alert=False)
         await send_paginated_opportunity(update, context, category=category, page=int(page_str), is_edit=True)
 
     # اختيار لغة إيميل التواصل للفرصة
@@ -502,7 +542,7 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown"
         )
         # تنفيذ الصيد في الخلفية
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         res = await loop.run_in_executor(None, execute_deep_hunt)
         
         finish_text = f"""
@@ -531,57 +571,229 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=REPLY_MARKUP
         )
 
+# ----------------- أوامر جديدة -----------------
+def _guard(fn):
+    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not check_user_auth(update, context):
+            await update.effective_message.reply_text(AUTH_LOCKED_TEXT, parse_mode="Markdown")
+            return
+        await fn(update, context)
+    return wrapper
+
+@_guard
+async def cmd_deadlines(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    days = 30
+    if context.args and context.args[0].isdigit():
+        days = min(int(context.args[0]), 365)
+    items = get_upcoming_deadlines(days)
+    if not items:
+        await update.message.reply_text(f"✅ لا توجد فرص تغلق خلال {days} يوماً.")
+        return
+    lines = [f"⏳ *فرص تغلق خلال {days} يوماً ({len(items)}):*\n"]
+    for o in items[:25]:
+        icon = "🔴" if o["days_left"] <= 7 else "🟠" if o["days_left"] <= 14 else "🟢"
+        lines.append(f"{icon} `{o['deadline'][:10]}` (باقي {o['days_left']}ي) — {o['title'][:60]} | {o['institution'][:30]}")
+    await safe_send(context.bot, update.effective_chat.id, "\n".join(lines), parse_mode="Markdown", disable_web_page_preview=True)
+
+@_guard
+async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    st = get_stats()
+    last = get_latest_hunting_stats()
+    lines = [f"📊 *إحصاءات الرادار*\n• فرص نشطة: *{st['total']}*"]
+    lines.append("\n🌍 *حسب الدولة:*")
+    lines += [f"  • {c}: {n}" for c, n in st["by_country"]]
+    lines.append("\n🏷️ *حسب النوع:*")
+    lines += [f"  • {c}: {n}" for c, n in st["by_type"]]
+    if last:
+        lines.append(f"\n⏱️ آخر صيد: `{last['timestamp']}` (جديد: {last['new_found']})")
+    await safe_send(context.bot, update.effective_chat.id, "\n".join(lines), parse_mode="Markdown")
+
+@_guard
+async def cmd_applications(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    apps = get_user_applications(str(update.effective_chat.id))
+    if not apps:
+        await update.message.reply_text("📌 لا توجد تقديمات متتبَّعة. اضغط «تتبّع التقديم» في أي بطاقة فرصة.")
+        return
+    icons = {"APPLIED": "📤", "INTERVIEW": "🗣️", "OFFER": "🏆", "REJECTED": "❌"}
+    lines = ["📌 *تقديماتي:*\n"]
+    for a in apps:
+        lines.append(f"{icons.get(a['app_status'], '•')} *{a['app_status']}* — {a['title'][:55]} | {a['institution'][:28]} (يغلق {(a.get('deadline') or '?')[:10]})")
+    await safe_send(context.bot, update.effective_chat.id, "\n".join(lines), parse_mode="Markdown", disable_web_page_preview=True)
+
+@_guard
+async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    favs = get_user_favorites(str(update.effective_chat.id))
+    if not favs:
+        await update.message.reply_text("⭐ مفضلتك فارغة.")
+        return
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["title", "institution", "country", "deadline", "funded", "salary", "link"])
+    for o in favs:
+        w.writerow([o["title"], o["institution"], o["country"], o["deadline"], o["is_funded"], o["monthly_salary"], o["link"]])
+    data = io.BytesIO(("﻿" + buf.getvalue()).encode("utf-8"))
+    data.name = "favorites.csv"
+    await update.message.reply_document(document=data, caption=f"⭐ {len(favs)} فرصة من المفضلة")
+
+@_guard
+async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "📋 *الأوامر:*\n"
+        "/start - القائمة الرئيسية\n/deadlines [أيام] - الفرص القريبة الإغلاق\n"
+        "/applications - متابعة تقديماتي\n/fav - المفضلة\n/export - تصدير المفضلة CSV\n"
+        "/stats - إحصاءات\n/reservoir /fresh /easy /corporate /internship /professors /hunt\n\n"
+        "أرسل أي كلمة للبحث مباشرة.",
+        parse_mode="Markdown", reply_markup=REPLY_MARKUP)
+
+# ----------------- أوامر جديدة -----------------
+def _guard(fn):
+    async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not check_user_auth(update, context):
+            await update.effective_message.reply_text(AUTH_LOCKED_TEXT, parse_mode="Markdown")
+            return
+        await fn(update, context)
+    return wrapper
+
+@_guard
+async def cmd_deadlines(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    days = 30
+    if context.args and context.args[0].isdigit():
+        days = min(int(context.args[0]), 365)
+    items = get_upcoming_deadlines(days)
+    if not items:
+        await update.message.reply_text(f"✅ لا توجد فرص تغلق خلال {days} يوماً.")
+        return
+    lines = [f"⏳ *فرص تغلق خلال {days} يوماً ({len(items)}):*\n"]
+    for o in items[:25]:
+        icon = "🔴" if o["days_left"] <= 7 else "🟠" if o["days_left"] <= 14 else "🟢"
+        lines.append(f"{icon} `{o['deadline'][:10]}` (باقي {o['days_left']}ي) — {o['title'][:60]} | {o['institution'][:30]}")
+    await safe_send(context.bot, update.effective_chat.id, "\n".join(lines), parse_mode="Markdown", disable_web_page_preview=True)
+
+@_guard
+async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    st = get_stats()
+    last = get_latest_hunting_stats()
+    lines = [f"📊 *إحصاءات الرادار*\n• فرص نشطة: *{st['total']}*"]
+    lines.append("\n🌍 *حسب الدولة:*")
+    lines += [f"  • {c}: {n}" for c, n in st["by_country"]]
+    lines.append("\n🏷️ *حسب النوع:*")
+    lines += [f"  • {c}: {n}" for c, n in st["by_type"]]
+    if last:
+        lines.append(f"\n⏱️ آخر صيد: `{last['timestamp']}` (جديد: {last['new_found']})")
+    await safe_send(context.bot, update.effective_chat.id, "\n".join(lines), parse_mode="Markdown")
+
+@_guard
+async def cmd_applications(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    apps = get_user_applications(str(update.effective_chat.id))
+    if not apps:
+        await update.message.reply_text("📌 لا توجد تقديمات متتبَّعة. اضغط «تتبّع التقديم» في أي بطاقة فرصة.")
+        return
+    icons = {"APPLIED": "📤", "INTERVIEW": "🗣️", "OFFER": "🏆", "REJECTED": "❌"}
+    lines = ["📌 *تقديماتي:*\n"]
+    for a in apps:
+        lines.append(f"{icons.get(a['app_status'], '•')} *{a['app_status']}* — {a['title'][:55]} | {a['institution'][:28]} (يغلق {(a.get('deadline') or '?')[:10]})")
+    await safe_send(context.bot, update.effective_chat.id, "\n".join(lines), parse_mode="Markdown", disable_web_page_preview=True)
+
+@_guard
+async def cmd_export(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    favs = get_user_favorites(str(update.effective_chat.id))
+    if not favs:
+        await update.message.reply_text("⭐ مفضلتك فارغة.")
+        return
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["title", "institution", "country", "deadline", "funded", "salary", "link"])
+    for o in favs:
+        w.writerow([o["title"], o["institution"], o["country"], o["deadline"], o["is_funded"], o["monthly_salary"], o["link"]])
+    data = io.BytesIO(("﻿" + buf.getvalue()).encode("utf-8"))
+    data.name = "favorites.csv"
+    await update.message.reply_document(document=data, caption=f"⭐ {len(favs)} فرصة من المفضلة")
+
+@_guard
+async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "📋 *الأوامر:*\n"
+        "/start - القائمة الرئيسية\n/deadlines [أيام] - الفرص القريبة الإغلاق\n"
+        "/applications - متابعة تقديماتي\n/fav - المفضلة\n/export - تصدير المفضلة CSV\n"
+        "/stats - إحصاءات\n/reservoir /fresh /easy /corporate /internship /professors /hunt\n\n"
+        "أرسل أي كلمة للبحث مباشرة.",
+        parse_mode="Markdown", reply_markup=REPLY_MARKUP)
+
 # ----------------- المهمة اليومية الصباحية -----------------
-async def daily_alert_job(context: ContextTypes.DEFAULT_TYPE):
-    logger.info("تشغيل صياد الفرص الصباحي التلقائي...")
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, execute_deep_hunt)
+async def send_digest_and_reminders(bot):
+    """يُستخدم من المهمة اليومية ومن سكربت GitHub Actions (run_daily.py)."""
+    closed = close_expired_opportunities()
+    logger.info(f"أُغلقت {closed} فرصة منتهية.")
 
     new_opps = get_new_opportunities_for_alert()
     closing_soon = get_closing_soon_opportunities()
-
-    if not new_opps and not closing_soon:
-        logger.info("لا توجد تنبيهات جديدة هذا الصباح.")
-        return
-
-    messages = build_daily_digest(new_opps, closing_soon, [])
-    subscribers = get_subscribers()
-    if TELEGRAM_CHAT_ID and TELEGRAM_CHAT_ID not in subscribers and TELEGRAM_CHAT_ID != "":
+    subscribers = list(get_subscribers())
+    if TELEGRAM_CHAT_ID and TELEGRAM_CHAT_ID not in subscribers:
         subscribers.append(TELEGRAM_CHAT_ID)
 
-    for chat_id in subscribers:
-        for msg in messages:
-            try:
-                await context.bot.send_message(
-                    chat_id=chat_id,
-                    text=msg,
-                    parse_mode="Markdown",
-                    disable_web_page_preview=True
-                )
-                await asyncio.sleep(0.4)
-            except Exception as e:
-                logger.error(f"خطأ أثناء الإرسال للمشترك {chat_id}: {e}")
+    if new_opps or closing_soon:
+        messages = build_daily_digest(new_opps, closing_soon, [])
+        for chat_id in subscribers:
+            for msg in messages:
+                try:
+                    await safe_send(bot, chat_id, msg, parse_mode="Markdown", disable_web_page_preview=True)
+                    await asyncio.sleep(0.4)
+                except Exception as e:
+                    logger.error(f"خطأ أثناء الإرسال للمشترك {chat_id}: {e}")
+        mark_as_notified_new([o["id"] for o in new_opps])
+        mark_as_notified_closing([o["id"] for o in closing_soon])
 
-    mark_as_notified_new([o["id"] for o in new_opps])
-    mark_as_notified_closing([o["id"] for o in closing_soon])
+    # تذكيرات شخصية للمفضلة قبل 7/3/1 أيام من الإغلاق
+    for chat_id, o in get_favorite_reminders(set(REMINDER_DAYS)):
+        try:
+            await safe_send(bot, chat_id,
+                            f"⏰ *تذكير:* تغلق «{o['title'][:70]}» بعد *{o['days_left']}* يوم(أيام) — {o['deadline'][:10]}\n{o['link']}",
+                            parse_mode="Markdown", disable_web_page_preview=True)
+        except Exception as e:
+            logger.error(f"تعذر إرسال التذكير إلى {chat_id}: {e}")
 
-def main():
-    init_db()
-    
-    # تنفيذ صيد أولي سريع عند الإقلاع
-    logger.info("بدء تشغيل بوت رادار وصياد دكتوراه البترول...")
+async def daily_alert_job(context: ContextTypes.DEFAULT_TYPE):
+    logger.info("تشغيل صياد الفرص الصباحي التلقائي...")
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, execute_deep_hunt)
+    await send_digest_and_reminders(context.bot)
+
+async def initial_hunt_job(context: ContextTypes.DEFAULT_TYPE):
+    loop = asyncio.get_running_loop()
     try:
-        execute_deep_hunt()
+        await loop.run_in_executor(None, execute_deep_hunt)
     except Exception as e:
         logger.warning(f"Initial hunt warning: {e}")
 
-    app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
+async def on_error(update, context: ContextTypes.DEFAULT_TYPE):
+    logger.error("Unhandled error", exc_info=context.error)
 
-    # الأوامر النصية
+async def post_init(app):
+    await app.bot.set_my_commands([
+        BotCommand("start", "القائمة الرئيسية"),
+        BotCommand("deadlines", "الفرص القريبة الإغلاق"),
+        BotCommand("applications", "متابعة تقديماتي"),
+        BotCommand("fav", "المفضلة"),
+        BotCommand("export", "تصدير المفضلة CSV"),
+        BotCommand("stats", "إحصاءات الرادار"),
+        BotCommand("hunt", "صيد فوري"),
+        BotCommand("help", "المساعدة"),
+    ])
+
+def main():
+    init_db()
+    logger.info("بدء تشغيل بوت رادار وصياد دكتوراه البترول...")
+
+    app = ApplicationBuilder().token(require_token()).post_init(post_init).build()
+
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("auth", cmd_auth))
     app.add_handler(CommandHandler("access", cmd_auth))
-    app.add_handler(CommandHandler("help", cmd_start))
+    app.add_handler(CommandHandler("help", cmd_help))
+    app.add_handler(CommandHandler("deadlines", cmd_deadlines))
+    app.add_handler(CommandHandler("stats", cmd_stats))
+    app.add_handler(CommandHandler("applications", cmd_applications))
+    app.add_handler(CommandHandler("export", cmd_export))
     app.add_handler(CommandHandler("reservoir", cmd_reservoir))
     app.add_handler(CommandHandler("fresh", cmd_no_exp))
     app.add_handler(CommandHandler("easy", cmd_easy))
@@ -590,17 +802,14 @@ def main():
     app.add_handler(CommandHandler("fav", cmd_favorites))
     app.add_handler(CommandHandler("hunt", cmd_hunter_hub))
     app.add_handler(CommandHandler("professors", cmd_professors))
-
-    # معالج الأزرار التفاعلية (Callbacks)
     app.add_handler(CallbackQueryHandler(handle_callbacks))
-
-    # معالج الرسائل النصية المكتوبة
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_user_text))
+    app.add_error_handler(on_error)
 
-    # جدولة التنبيه الصباحي التلقائي
     job_queue = app.job_queue
     if job_queue:
         from datetime import time
+        job_queue.run_once(initial_hunt_job, when=5)  # لا نحجب الإقلاع بالصيد
         job_queue.run_daily(
             daily_alert_job,
             time=time(hour=DAILY_REPORT_HOUR, minute=DAILY_REPORT_MINUTE),

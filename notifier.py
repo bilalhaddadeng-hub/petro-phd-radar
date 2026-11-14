@@ -49,7 +49,15 @@ def format_opportunity_card(opp: Dict, tag: str = "", current_idx: int = 0, tota
 """
     return card.strip()
 
-def build_opportunity_keyboard(opp: Dict, category: str, page: int, total: int, is_fav: bool = False) -> InlineKeyboardMarkup:
+APP_STATUS_LABELS = {
+    None: "📌 تتبّع التقديم",
+    "APPLIED": "📤 قدّمت (اضغط للتحديث)",
+    "INTERVIEW": "🗣️ مقابلة (اضغط للتحديث)",
+    "OFFER": "🏆 عرض (اضغط للتحديث)",
+    "REJECTED": "❌ رُفض (اضغط للإزالة)",
+}
+
+def build_opportunity_keyboard(opp: Dict, category: str, page: int, total: int, is_fav: bool = False, app_status=None) -> InlineKeyboardMarkup:
     """
     إنشاء لوحة أزرار تفاعلية أنيقة ملحقة بكل فرصة:
     - رابط التقديم المباشر كزر خارجي (URL Button)
@@ -67,7 +75,9 @@ def build_opportunity_keyboard(opp: Dict, category: str, page: int, total: int, 
         [
             InlineKeyboardButton("✉️ جهز إيميل المشرف", callback_data=f"mail:{opp['id']}"),
             InlineKeyboardButton(fav_text, callback_data=fav_data)
-        ]
+        ],
+        [InlineKeyboardButton(APP_STATUS_LABELS.get(app_status, APP_STATUS_LABELS[None]),
+                              callback_data=f"trk:{opp['id']}:{category}:{page}")]
     ]
 
     # أزرار التنقل الدائري السلس بين الصفحات

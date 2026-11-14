@@ -2,9 +2,9 @@ name: Daily Petroleum PhD Radar
 
 on:
   schedule:
-    # يعمل يومياً عند الساعة 08:00 بتوقيت UTC (الساعة 09:00 بتوقيت إيطاليا والجزائر)
+    # يعمل يومياً عند الساعة 08:00 بتوقيت UTC
     - cron: '0 8 * * *'
-  workflow_dispatch: # يتيح لك تشغيله يدوياً بأي وقت بضغطة زر
+  workflow_dispatch:
 
 jobs:
   run-radar:
@@ -19,42 +19,11 @@ jobs:
           python-version: '3.11'
 
       - name: Install Dependencies
-        run: |
-          pip install -r requirements.txt
+        run: pip install -r requirements.txt
 
       - name: Run Global Scan and Send Telegram Alerts
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: |
-          python -c "
-          from bot import perform_global_scan
-          from database import init_db, get_new_opportunities_for_alert, get_closing_soon_opportunities, get_subscribers, mark_as_notified_new
-          from notifier import build_daily_digest
-          import asyncio
-          import os
-          from telegram import Bot
-
-          init_db()
-          perform_global_scan()
-
-          new_opps = get_new_opportunities_for_alert()
-          closing = get_closing_soon_opportunities()
-
-          messages = build_daily_digest(new_opps, closing, [])
-          token = os.getenv('TELEGRAM_BOT_TOKEN')
-          chat_id = os.getenv('TELEGRAM_CHAT_ID')
-
-          async def send_all():
-              bot = Bot(token=token)
-              targets = [chat_id] if chat_id else get_subscribers()
-              for t in targets:
-                  for m in messages:
-                      try:
-                          await bot.send_message(chat_id=t, text=m, parse_mode='Markdown')
-                      except Exception as e:
-                          print('Error sending:', e)
-
-          if messages and token:
-              asyncio.run(send_all())
-          "
+          OWNER_CHAT_IDS: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python run_daily.py
