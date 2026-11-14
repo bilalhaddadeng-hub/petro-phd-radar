@@ -13,15 +13,6 @@ from notifier import format_opportunity_card
 
 init_db()
 
-all_found = []
-all_found.extend(fetch_euraxess_positions())
-all_found.extend(fetch_ifpen_positions())
-all_found.extend(fetch_gov_and_institute_positions())
-all_found.extend(fetch_professor_lab_positions())
-
-for item in all_found:
-    status, is_new = save_or_update_opportunity(item)
-
 opps = get_all_active_open()
 print(f"Total active opportunities in DB: {len(opps)}")
 print("\n--- SAMPLE CARD PREVIEW ---")

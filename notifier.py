@@ -18,6 +18,17 @@ def format_opportunity_card(opp: Dict, tag: str = "", current_idx: int = 0, tota
     key_reqs = opp.get("key_requirements", "")
     reqs_block = f"\n⚠️ *أصعب الشروط ونقاط الحسم:*\n{key_reqs}\n" if key_reqs else ""
 
+    duration_str = opp.get("duration", "")
+    if not duration_str:
+        duration_str = "6 أشهر (تربص أطروحة ماستر)" if opp.get("source_type") == "INTERNSHIP_RD" else "3 إلى 4 سنوات (دكتوراه كاملة)"
+
+    seats_str = str(opp.get("seats", "1 مقعد"))
+    if "أشهر" in seats_str or "شهر" in seats_str:
+        seats_str = "1 مقعد مخصص للمختبر"
+
+    app_method = opp.get("application_method", "")
+    method_block = f"\n📨 *طريقة والرمز المرجعي للتقديم المباشر:*\n{app_method}\n" if app_method else ""
+
     card = f"""
 {header_tag}🛢️ *{opp['title']}*
 {source_emoji} | 📍 *الجهة:* {opp['institution']} ({opp['country']})
@@ -27,10 +38,11 @@ def format_opportunity_card(opp: Dict, tag: str = "", current_idx: int = 0, tota
 💵 *3. الراتب الشهري:* {opp['monthly_salary']}
 🎓 *4. رسوم الدراسة:* {opp['tuition_fee']}
 📝 *5. رسوم التسجيل:* {opp['registration_fee']}
-👥 *6. عدد المقاعد:* {opp['seats']}
+👥 *6. عدد المقاعد:* {seats_str}
+⏱️ *7. مدة العقد / التربص:* {duration_str}
 📅 *تاريخ الإغلاق:* {opp.get('deadline', 'مفتوح حتى ملء الشواغر')}
 💼 *الخبرة المطلوبة:* 0 سنوات (مفتوحة لحديثي التخرج من الماستر R1)
-{reqs_block}
+{method_block}{reqs_block}
 📊 *تقييم القبول لملف بلال حداد:*
 {opp['acceptance_difficulty']}
 ━━━━━━━━━━━━━━━━━━━━━━

@@ -230,14 +230,24 @@ html_content = f"""<!DOCTYPE html>
                                 <span class="field-val">${{o.registration_fee}}</span>
                             </div>
                             <div class="field-item">
-                                <span class="field-label">👥 المقاعد المتاحة:</span>
+                                <span class="field-label">👥 عدد المقاعد:</span>
                                 <span class="field-val">${{o.seats}}</span>
+                            </div>
+                            <div class="field-item">
+                                <span class="field-label">⏱️ مدة العقد / التربص:</span>
+                                <span class="field-val" style="color: #60a5fa; font-weight: 600;">${{o.duration || '3 إلى 4 سنوات'}}</span>
                             </div>
                             <div class="field-item">
                                 <span class="field-label">📅 الموعد النهائي:</span>
                                 <span class="field-val">${{o.deadline || 'مستمر'}}</span>
                             </div>
                         </div>
+
+                        ${{o.application_method ? `
+                        <div style="background: rgba(59, 130, 246, 0.08); border-right: 3px solid #3b82f6; padding: 10px 12px; border-radius: 8px; margin-bottom: 12px; font-size: 0.83rem; line-height: 1.5; color: #bfdbfe;">
+                            <div style="font-weight: 700; color: #60a5fa; margin-bottom: 3px;">📨 طريقة والرمز المرجعي للتقديم المباشر:</div>
+                            <div>${{o.application_method.replace(/\\n/g, '<br>')}}</div>
+                        </div>` : ''}}
 
                         ${{o.key_requirements ? `
                         <div style="background: rgba(245, 158, 11, 0.08); border-right: 3px solid #f59e0b; padding: 12px; border-radius: 8px; margin-bottom: 12px; font-size: 0.83rem; line-height: 1.5; color: #fde68a;">

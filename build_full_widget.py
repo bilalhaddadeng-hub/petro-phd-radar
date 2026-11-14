@@ -7,7 +7,7 @@ def build_widget():
     c.execute("""
         SELECT id, title, institution, country, source_type, sub_specialty, 
                is_funded, monthly_salary, tuition_fee, registration_fee, seats, 
-               deadline, link, acceptance_difficulty, key_requirements
+               duration, application_method, deadline, link, acceptance_difficulty, key_requirements
         FROM opportunities
     """)
     rows = c.fetchall()
@@ -15,32 +15,37 @@ def build_widget():
 
     items = []
     for r in rows:
-        oid, title, inst, country, stype, sub, funded, salary, tuition, reg, seats, dline, link, acc, reqs = r
+        oid, title, inst, country, stype, sub, funded, salary, tuition, reg, seats, duration, app_method, dline, link, acc, reqs = r
         
         # Tagging for filtering
         tags = ["all", "no_exp"]
         stype_lower = (stype or "").lower()
         title_lower = (title or "").lower()
         sub_lower = (sub or "").lower()
+        inst_lower = (inst or "").lower()
 
         if any(w in title_lower or w in sub_lower for w in ["reservoir", "storage", "ccus", "carbon", "hydrogen", "multiphase", "flow"]):
             tags.append("reservoir_storage")
         
-        if "company" in stype_lower or any(co in inst.lower() for co in ["eni", "total", "slb", "equinor", "baker"]):
+        if any(w in inst_lower for w in ["beicip", "rfd", "tnavigator", "tgt", "erce", "storegga", "tno", "gfz", "carbfix", "panterra", "resoptima", "wintershall"]):
+            tags.append("consulting")
+        elif "company" in stype_lower or any(co in inst_lower for co in ["eni", "total", "slb", "equinor", "baker"]):
             tags.append("company")
         elif "internship" in stype_lower or "stage" in title_lower or "internship" in title_lower or "tirocinio" in title_lower:
             tags.append("internship")
-        elif "government" in stype_lower or "fellowship" in title_lower or "kfupm" in inst.lower() or "stipendium" in title_lower:
+        elif "government" in stype_lower or "fellowship" in title_lower or "kfupm" in inst_lower or "stipendium" in title_lower:
             tags.append("government")
         else:
             tags.append("university")
 
         # Type badge
         badge = "🏛️ دكتوراه أكاديمية"
-        if "company" in tags:
-            badge = "🏢 دكتوراه صناعية / شركات R&D"
+        if "consulting" in tags:
+            badge = "🏢 شركات استشارية ومتوسطة R&D"
+        elif "company" in tags:
+            badge = "🌐 دكتوراه صناعية / شركات عالمية"
         elif "internship" in tags:
-            badge = "💼 تربص أطروحة / تدريب R&D"
+            badge = "💼 تربص أطروحة ماستر مدفوع R&D"
         elif "government" in tags:
             badge = "👑 منحة تمويل حكومية / كاملة"
 
@@ -55,7 +60,9 @@ def build_widget():
             "salary": salary,
             "tuition": tuition,
             "reg": reg,
-            "seats": seats,
+            "seats": seats or "1 مقعد",
+            "duration": duration or "3 إلى 4 سنوات",
+            "method": app_method or "عبر بوابة التقديم الرسمية المباشرة",
             "deadline": dline or "مفتوح حتى ملء الشواغر",
             "eval": acc,
             "reqs": reqs or "• الشهادة: ماستر معترف به بنظام ECTS أو ما يعادله.\n• اللغة: الإنجليزية الأكاديمية (B2/C1) أو لغة البلد.\n• حسم بلال: تطابق كامل وسلس دون تعقيدات.",
@@ -81,13 +88,13 @@ def build_widget():
     <div class="flex items-center justify-between gap-2 pb-2 border-b border-[var(--card-border)]">
       <div>
         <span class="font-bold text-sm text-[var(--foreground)] flex items-center gap-1.5">
-          🛢️ رادار هندسة المكامن والبترول العالمي الموثق (Global Petro & R&D Radar)
+          🛢️ رادار هندسة المكامن والبترول العالمي المدقق (Global Petro & R&D Radar)
         </span>
-        <p class="text-[11px] text-[var(--muted-foreground)]">33 فرصة نشطة مدققة 100% • روابط مباشرة مفحوصة (Zero Dead Links) • أصعب الشروط ونقاط الحسم</p>
+        <p class="text-[11px] text-[var(--muted-foreground)]">24 فرصة فريدة 100% • جامعات + شركات استشارية ومتوسطة ومخابر • روابط مباشرة مفحوصة (Zero Dead Links)</p>
       </div>
       <div class="flex items-center gap-1.5">
         <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-600 border border-emerald-500/30">
-          ✓ روابط 200 OK
+          ✓ روابط 200 OK مباشرة
         </span>
         <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[var(--primary)]/15 text-[var(--primary)] border border-[var(--primary)]/30">
           0 سنوات خبرة
@@ -99,14 +106,15 @@ def build_widget():
     <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px]">
       <button onclick="setFilter('all')" id="btn-all" class="px-2.5 py-1 rounded-md font-semibold bg-[var(--primary)] text-[var(--primary-foreground)] transition">الكل ({len(items)})</button>
       <button onclick="setFilter('reservoir_storage')" id="btn-reservoir_storage" class="px-2.5 py-1 rounded-md font-semibold bg-[var(--card)] hover:bg-[var(--card-border)] text-[var(--muted-foreground)] transition">🛢️ مكامن وتخزين جوفي</button>
-      <button onclick="setFilter('company')" id="btn-company" class="px-2.5 py-1 rounded-md font-semibold bg-[var(--card)] hover:bg-[var(--card-border)] text-[var(--muted-foreground)] transition">🏢 شركات R&D (Eni/Total/SLB)</button>
+      <button onclick="setFilter('consulting')" id="btn-consulting" class="px-2.5 py-1 rounded-md font-semibold bg-[var(--card)] hover:bg-[var(--card-border)] text-[var(--muted-foreground)] transition">🏢 شركات استشارية ومتوسطة R&D</button>
+      <button onclick="setFilter('company')" id="btn-company" class="px-2.5 py-1 rounded-md font-semibold bg-[var(--card)] hover:bg-[var(--card-border)] text-[var(--muted-foreground)] transition">🌐 كبرى الشركات (Eni/Total/SLB)</button>
       <button onclick="setFilter('internship')" id="btn-internship" class="px-2.5 py-1 rounded-md font-semibold bg-[var(--card)] hover:bg-[var(--card-border)] text-[var(--muted-foreground)] transition">💼 تربصات ماستر R&D</button>
       <button onclick="setFilter('government')" id="btn-government" class="px-2.5 py-1 rounded-md font-semibold bg-[var(--card)] hover:bg-[var(--card-border)] text-[var(--muted-foreground)] transition">👑 منح كاملة (KFUPM/Gov)</button>
     </div>
 
     <!-- Search Input -->
     <div class="flex items-center gap-2">
-      <input type="text" id="searchInput" oninput="handleSearch()" placeholder="🔍 ابحث في الفرص بالكلمة (مثال: Leoben, Eni, Multiphase, تدريب, Norway)..." class="w-full px-2.5 py-1.5 rounded-md text-[11px] border border-[var(--card-border)] bg-[var(--card)] text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)]" />
+      <input type="text" id="searchInput" oninput="handleSearch()" placeholder="🔍 ابحث بالاسم أو الشركة (مثال: Beicip, Leoben, tNavigator, TGT, Eni, Storage, Norway)..." class="w-full px-2.5 py-1.5 rounded-md text-[11px] border border-[var(--card-border)] bg-[var(--card)] text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)]" />
     </div>
 
     <!-- Card Box -->
@@ -119,7 +127,7 @@ def build_widget():
       <button onclick="prevCard()" class="px-3 py-1 rounded border border-[var(--card-border)] hover:bg-[var(--card)] font-medium text-[var(--muted-foreground)] transition flex items-center gap-1">
         ◀ السابق
       </button>
-      <span id="pageIndicator" class="font-mono text-[var(--muted-foreground)] font-semibold">1 / 33</span>
+      <span id="pageIndicator" class="font-mono text-[var(--muted-foreground)] font-semibold">1 / {len(items)}</span>
       <button onclick="nextCard()" class="px-3 py-1 rounded border border-[var(--card-border)] hover:bg-[var(--card)] font-medium text-[var(--muted-foreground)] transition flex items-center gap-1">
         التالي ▶
       </button>
@@ -189,6 +197,15 @@ def build_widget():
         </div>
       ` : '';
 
+      const methodHtml = item.method ? `
+        <div class=\"p-2.5 rounded-md bg-blue-500/10 border border-blue-500/25 space-y-0.5\">
+          <span class=\"font-bold text-blue-600 dark:text-blue-400 text-[11px] flex items-center gap-1\">
+            📨 طريقة والرمز المرجعي للتقديم المباشر:
+          </span>
+          <p class=\"text-[11px] text-[var(--foreground)] leading-relaxed\">${{escapeHtml(item.method)}}</p>
+        </div>
+      ` : '';
+
       box.innerHTML = `
         <div class=\"flex items-start justify-between gap-2\">
           <div class=\"space-y-0.5\">
@@ -208,10 +225,13 @@ def build_widget():
         <div class=\"grid grid-cols-2 gap-2 p-2 rounded bg-[var(--background)] border border-[var(--card-border)] text-[11px]\">
           <div><span class=\"text-[var(--muted-foreground)]\">🎯 التخصص:</span> <span class=\"font-medium\">${{escapeHtml(item.sub)}}</span></div>
           <div><span class=\"text-[var(--muted-foreground)]\">💵 الراتب/المكافأة:</span> <span class=\"font-medium text-emerald-600 dark:text-emerald-400\">${{escapeHtml(item.salary)}}</span></div>
+          <div><span class=\"text-[var(--muted-foreground)]\">👥 عدد المقاعد:</span> <span class=\"font-medium\">${{escapeHtml(item.seats)}}</span></div>
+          <div><span class=\"text-[var(--muted-foreground)]\">⏱️ مدة العقد / التربص:</span> <span class=\"font-medium text-blue-600 dark:text-blue-400\">${{escapeHtml(item.duration)}}</span></div>
           <div><span class=\"text-[var(--muted-foreground)]\">🎓 الرسوم:</span> <span class=\"font-medium\">${{escapeHtml(item.tuition)}}</span></div>
-          <div><span class=\"text-[var(--muted-foreground)]\">👥 المقاعد / الخبرة:</span> <span class=\"font-medium\">${{item.seats}} • خبرة 0 سنوات</span></div>
+          <div><span class=\"text-[var(--muted-foreground)]\">💼 الخبرة المطلوبة:</span> <span class=\"font-medium text-emerald-600 dark:text-emerald-400\">0 سنوات (مفتوحة للماستر)</span></div>
         </div>
 
+        ${{methodHtml}}
         ${{reqsHtml}}
 
         <div class=\"p-2.5 rounded-md bg-emerald-500/10 border border-emerald-500/25 space-y-0.5\">
@@ -221,7 +241,7 @@ def build_widget():
 
         <div class=\"pt-1\">
           <a href=\"${{item.link}}\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"w-full py-2 px-3 rounded-md font-bold text-xs bg-[var(--primary)] hover:opacity-90 text-[var(--primary-foreground)] flex items-center justify-center gap-1.5 shadow transition text-center\">
-            🌐 فتح رابط التفاصيل والتقديم المباشر المؤكد (200 OK) ↗
+            🌐 فتح رابط العرض والتقديم المباشر المؤكد (200 OK) ↗
           </a>
         </div>
       `;

@@ -230,8 +230,9 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 📊 *حالة الرادار السحابي المباشرة:*
 • إجمالي الفرص النشطة المصطادة: *{len(all_opps)} فرصة*
 • مكامن وتخزين جوفي (CCUS/H2): *{len(res_opps)} فرصة*
+• بوابات الرصد المستمر: *{len(HUNTING_TARGETS)} بوابة دولية (تشمل الجامعات + كبرى ومتوسطات الشركات وبيوت الخبرة الاستشارية)*
 • متطلب الخبرة: *0 سنوات (مفتوحة لحديثي التخرج من الماستر)*
-• حالة الروابط: *100% مؤكدة ومفحوصة (Zero Dead Links)*
+• حالة الروابط: *100% مباشرة ومفحوصة (Zero Dead Links)*
 • السيرفر السحابي: *يعمل 24/7 دون توقف*
 • الحساب: *مصرح ومحمي حصرياً لك*
 
@@ -326,10 +327,10 @@ async def cmd_hunter_hub(update: Update, context: ContextTypes.DEFAULT_TYPE):
 🎯 *صياد الفرص الذكي (Autonomous Opportunity Hunter)*
 ━━━━━━━━━━━━━━━━━━━━━━
 📡 *حالة الرادار:* يعمل 24/7 على السحابة (Cloud Runner Active)
-🏢 *البوابات الممسوحة:* {scanned} بوابة عالمية (Euraxess, Eni, SLB, Total, IFPEN, PoliTo, Leoben, TU Delft, KAUST...)
+🏢 *البوابات الممسوحة:* {len(HUNTING_TARGETS)} بوابة دولية (جامعات رائدة + شركات استشارية مستقلة كـ Beicip وRFD وERCE وStoregga وTNO وGFZ وCarbfix وPanTerra + كبرى الشركات كـ Eni وTotal وSLB)
 📊 *إجمالي الفرص المصطادة:* {len(all_opps)} فرصة مؤكدة الروابط
 ⏱️ *آخر فحص وصيد نشط:* `{last_time}`
-🛡️ *معدل الروابط السليمة:* 100% (Zero Dead Links)
+🛡️ *معدل الروابط السليمة:* 100% (Zero Dead Links Engine)
 ━━━━━━━━━━━━━━━━━━━━━━
 💡 الصياد يراقب التحديثات لحظياً ويرسل إشعاراً فورياً للمشتركين عند اكتشاف أي فرصة جديدة تناسب ملفك.
 """

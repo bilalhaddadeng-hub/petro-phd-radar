@@ -23,23 +23,42 @@ HEADERS = {
     "Accept-Language": "en-US,en;q=0.9,ar;q=0.8,it;q=0.7"
 }
 
-# المصادر والبوابات الحية التي يستهدفها الصياد
+# المصادر والبوابات الحية الموسعة التي يستهدفها الصياد (جامعات، معاهد، وشركات كبرى ومتوسطة واستشارية متخصصة)
 HUNTING_TARGETS = [
-    {"name": "Euraxess European Research Portal", "url": "https://euraxess.ec.europa.eu/jobs/search", "category": "EU_GOV"},
-    {"name": "Politecnico di Torino - DIATI PhD Portal", "url": "https://www.polito.it/didattica/dottorato-di-ricerca/ammissione-al-dottorato", "category": "ITALY_ACADEMIC"},
-    {"name": "Politecnico di Milano - DICA Subsurface Group", "url": "https://www.polimi.it/dottorato", "category": "ITALY_ACADEMIC"},
-    {"name": "Eni S.p.A. San Donato Milanese R&D Careers", "url": "https://www.eni.com/en-IT/careers/job-opportunities.html", "category": "CORPORATE_RD"},
-    {"name": "SLB Early Careers & R&D Hub", "url": "https://careers.slb.com/early-careers", "category": "CORPORATE_RD"},
-    {"name": "TotalEnergies Student & R&D CIFRE Doctorates", "url": "https://totalenergies.com/careers", "category": "CORPORATE_RD"},
-    {"name": "IFP Energies nouvelles (IFPEN) Theses Portal", "url": "https://theses.ifpen.fr/", "category": "RESEARCH_INSTITUTE"},
-    {"name": "Montanuniversität Leoben - Chair of Reservoir Engineering", "url": "https://www.unileoben.ac.at/en/jobs/", "category": "RESERVOIR_STORAGE"},
-    {"name": "TU Delft Geoscience & Engineering Department", "url": "https://www.tudelft.nl/citg/over-faculteit/afdelingen/geoscience-engineering", "category": "RESERVOIR_STORAGE"},
-    {"name": "Heriot-Watt University Institute of GeoEnergy Engineering", "url": "https://www.hw.ac.uk/about/our-schools/energy-geoscience-infrastructure-and-society/research-institutes/geoenergy-engineering", "category": "RESERVOIR_STORAGE"},
-    {"name": "KFUPM College of Petroleum Engineering & Geosciences (CPG)", "url": "https://cpg.kfupm.edu.sa/academics/departments/department-of-petroleum-engineering/graduate-programs/", "category": "MIDDLE_EAST"},
-    {"name": "KAUST Advanced Reservoir & Energy Storage (ANPER Lab)", "url": "https://admissions.kaust.edu.sa/study/internships", "category": "MIDDLE_EAST"},
-    {"name": "NTNU Norwegian University of Science & Technology", "url": "https://www.ntnu.edu/phd", "category": "NORWAY"},
-    {"name": "University of Stavanger (UiS) Petroleum Geomechanics", "url": "https://www.uis.no/en", "category": "NORWAY"},
-    {"name": "TU Bergakademie Freiberg Underground Energy & H2 Storage", "url": "https://tu-freiberg.de/en/grafa", "category": "GERMANY"}
+    # 1. كراسي هندسة المكامن والجامعات الرائدة
+    {"name": "Montanuniversität Leoben - Chair of Reservoir Engineering", "url": "https://www.unileoben.ac.at/jobs/", "category": "RESERVOIR_STORAGE"},
+    {"name": "TU Delft Geoscience & Engineering Department", "url": "https://careers.tudelft.nl/?locale=en_US", "category": "RESERVOIR_STORAGE"},
+    {"name": "Politecnico di Torino - Scuola di Dottorato", "url": "https://www.polito.it/en/education/phd-programmes/admissions-to-phd-programmes", "category": "ITALY_ACADEMIC"},
+    {"name": "Politecnico di Milano - DICA Department", "url": "https://www.polimi.it/dottorato", "category": "ITALY_ACADEMIC"},
+    {"name": "TU Bergakademie Freiberg - GraFA Graduate School", "url": "https://tu-freiberg.de/en/grafa", "category": "GERMANY"},
+    {"name": "University of Stavanger (UiS) Energy Resources", "url": "https://www.uis.no/en/research/phd-programmes", "category": "NORWAY"},
+    {"name": "KFUPM College of Petroleum & Geosciences (CPG)", "url": "https://cgis.kfupm.edu.sa/", "category": "MIDDLE_EAST"},
+    {"name": "KAUST Visiting Student Research Program (VSRP)", "url": "https://admissions.kaust.edu.sa/study/internships", "category": "MIDDLE_EAST"},
+    {"name": "AGH University of Krakow - Drilling, Oil & Gas", "url": "https://sd.agh.edu.pl/en/", "category": "EUROPE_ACADEMIC"},
+    {"name": "Heriot-Watt University - Institute of GeoEnergy (IGE)", "url": "https://www.hw.ac.uk/about/our-schools/energy-geoscience-infrastructure-and-society/research-institutes/geoenergy-engineering", "category": "RESERVOIR_STORAGE"},
+    {"name": "Euraxess European Researchers Portal", "url": "https://euraxess.ec.europa.eu/", "category": "EU_GOV"},
+
+    # 2. الشركات الاستشارية والمتوسطة والمتخصصة في المكامن ومحاكاة الموائع
+    {"name": "Beicip-Franlab (Reservoir & Basin Consulting - IFPEN)", "url": "https://www.beicip.com/careers/", "category": "CONSULTING_MIDSIZE"},
+    {"name": "Rock Flow Dynamics (RFD tNavigator Simulation)", "url": "https://rfdyn.com/about/careers/", "category": "SOFTWARE_RESERVOIR"},
+    {"name": "TGT Diagnostics (Subsurface Well & Flow Analytics)", "url": "https://tgtdiagnostics.com/career/", "category": "DIAGNOSTICS_FLOW"},
+    {"name": "Sproule - ERCE Energy (Independent Reserves & Reservoir)", "url": "https://sproule-erce.com/careers/", "category": "CONSULTING_MIDSIZE"},
+    {"name": "Storegga (Pure-play Geological Carbon Storage)", "url": "https://storegga.earth/careers", "category": "CCS_STARTUP"},
+    {"name": "TNO Applied Geosciences (Subsurface Energy Storage)", "url": "https://www.tno.nl/en/careers/", "category": "RESEARCH_INSTITUTE"},
+    {"name": "GFZ Helmholtz Potsdam (Porous Media & Geomechanics)", "url": "https://www.gfz.de/en/career/job-offers", "category": "RESEARCH_INSTITUTE"},
+    {"name": "Carbfix (CO2 Basalt Porous Mineralization)", "url": "https://www.carbfix.com/careers", "category": "CCS_STARTUP"},
+    {"name": "PanTerra Geoconsultants (Core Analysis & Reservoir Flooding)", "url": "https://www.panterra.nl/careers/", "category": "CONSULTING_MIDSIZE"},
+    {"name": "Resoptima (Ensemble History Matching & Modeling)", "url": "https://resoptima.com/careers/", "category": "SOFTWARE_RESERVOIR"},
+    {"name": "Wintershall Dea (Gas & CCUS Subsurface Operator)", "url": "https://wintershalldea.de/en/careers", "category": "OPERATOR_MIDSIZE"},
+
+    # 3. الشركات العالمية الكبرى والمراكز الوطنية
+    {"name": "Eni S.p.A. - San Donato Milanese R&D Labs", "url": "https://www.eni.com/en-IT/careers/job-opportunities.html", "category": "CORPORATE_RD"},
+    {"name": "TotalEnergies OneTech (CSTJF Pau Technical Center)", "url": "https://totalenergies.com/careers", "category": "CORPORATE_RD"},
+    {"name": "IFP Energies nouvelles (IFPEN Theses & Stage R&D)", "url": "https://theses.ifpen.fr/", "category": "RESEARCH_INSTITUTE"},
+    {"name": "SLB Early Careers (Schlumberger Reservoir Software)", "url": "https://careers.slb.com/early-careers", "category": "CORPORATE_RD"},
+    {"name": "Baker Hughes Students (Subsurface Reinjection)", "url": "https://careers.bakerhughes.com/global/en/students", "category": "CORPORATE_RD"},
+    {"name": "Equinor Research Centre (Subsurface & Northern Lights)", "url": "https://www.equinor.com/careers/students-and-graduates", "category": "CORPORATE_RD"},
+    {"name": "OGS Trieste (Istituto Nazionale Oceanografia e Geofisica)", "url": "https://www.ogs.it/it", "category": "ITALY_ACADEMIC"}
 ]
 
 def verify_live_url(url: str, timeout: int = 5) -> Tuple[bool, str]:

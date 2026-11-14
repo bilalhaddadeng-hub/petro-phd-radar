@@ -35,13 +35,19 @@ def init_db():
         notified_closing_soon INTEGER DEFAULT 0,
         experience_required TEXT,
         category TEXT,
-        key_requirements TEXT
+        key_requirements TEXT,
+        duration TEXT,
+        application_method TEXT
     )
     """)
     cursor.execute("PRAGMA table_info(opportunities)")
     cols = [r[1] for r in cursor.fetchall()]
     if "key_requirements" not in cols:
         cursor.execute("ALTER TABLE opportunities ADD COLUMN key_requirements TEXT")
+    if "duration" not in cols:
+        cursor.execute("ALTER TABLE opportunities ADD COLUMN duration TEXT")
+    if "application_method" not in cols:
+        cursor.execute("ALTER TABLE opportunities ADD COLUMN application_method TEXT")
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS subscribers (
         chat_id TEXT PRIMARY KEY,
@@ -157,15 +163,18 @@ def save_or_update_opportunity(data: Dict) -> Tuple[str, bool]:
     exp_req = data.get("experience_required", "0 سنوات (مفتوحة بالكامل لحديثي التخرج من الماستر / Early Stage Researcher)")
     category = data.get("category", "RESERVOIR_STORAGE")
     key_reqs = data.get("key_requirements", "")
+    duration = data.get("duration", "3 إلى 4 سنوات (دكتوراه كاملة)" if data.get("source_type") != "INTERNSHIP_RD" else "6 أشهر (تربص أطروحة ماستر)")
+    app_method = data.get("application_method", "عبر بوابة التقديم الرسمية المباشرة")
 
     if row is None:
         cursor.execute("""
         INSERT OR REPLACE INTO opportunities (
             id, title, link, institution, country, source_type, sub_specialty,
             deadline, tuition_fee, registration_fee, monthly_salary, is_funded,
-            seats, acceptance_difficulty, status, first_seen_at, last_updated_at,
-            notified_as_new, notified_closing_soon, experience_required, category, key_requirements
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NEW', ?, ?, 0, 0, ?, ?, ?)
+            seats, duration, application_method, acceptance_difficulty, status,
+            first_seen_at, last_updated_at, notified_as_new, notified_closing_soon,
+            experience_required, category, key_requirements
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'NEW', ?, ?, 0, 0, ?, ?, ?)
         """, (
             opp_id,
             title,
@@ -180,6 +189,8 @@ def save_or_update_opportunity(data: Dict) -> Tuple[str, bool]:
             data.get("monthly_salary", "ممولة"),
             data.get("is_funded", "نعم"),
             data.get("seats", "1 مقعد"),
+            duration,
+            app_method,
             data.get("acceptance_difficulty", "متوسطة"),
             now_str,
             now_str,
@@ -212,6 +223,8 @@ def save_or_update_opportunity(data: Dict) -> Tuple[str, bool]:
             monthly_salary = ?,
             is_funded = ?,
             seats = ?,
+            duration = ?,
+            application_method = ?,
             acceptance_difficulty = ?,
             experience_required = ?,
             category = ?,
@@ -231,6 +244,8 @@ def save_or_update_opportunity(data: Dict) -> Tuple[str, bool]:
             data.get("monthly_salary", "ممولة"),
             data.get("is_funded", "نعم"),
             data.get("seats", "1 مقعد"),
+            duration,
+            app_method,
             data.get("acceptance_difficulty", "متوسطة"),
             exp_req,
             category,
