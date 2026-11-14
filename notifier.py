@@ -62,7 +62,7 @@ def build_opportunity_keyboard(opp: Dict, category: str, page: int, total: int, 
 
     keyboard = [
         # زر الرابط المباشر
-        [InlineKeyboardButton("🌐 فتح رابط التقديم المباشر (200 OK)", url=opp["link"])],
+        [InlineKeyboardButton("📄 فتح الإعلان الرسمي / التقديم المباشر", url=opp["link"])],
         # أزرار الإجراءات
         [
             InlineKeyboardButton("✉️ جهز إيميل المشرف", callback_data=f"mail:{opp['id']}"),
