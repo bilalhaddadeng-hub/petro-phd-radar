@@ -46,6 +46,10 @@ SEARCH_QUERIES = [
 ]
 
 
+class SourceSkipped(Exception):
+    """مصدر معطّل بإعداد ناقص (ليس عطلاً)."""
+
+
 def _get(url: str, params: Optional[dict] = None, timeout: int = 20) -> Optional[requests.Response]:
     try:
         r = requests.get(url, params=params, headers=HEADERS, timeout=timeout)
@@ -167,7 +171,7 @@ def parse_euraxess(html: str) -> List[Dict]:
     return out
 
 
-def fetch_euraxess(pages: int = 40) -> List[Dict]:
+def fetch_euraxess(pages: int = 80) -> List[Dict]:
     # EURAXESS لا يطبّق فلتر الكلمات من الرابط، لذا نقرأ أحدث الصفحات ونصفّي محلياً
     def one(p):
         r = _get("https://euraxess.ec.europa.eu/jobs/search", {"page": p})
@@ -215,7 +219,92 @@ def fetch_arbeitnow(pages: int = 6) -> List[Dict]:
     return results
 
 
+# ------------------- لوحات توظيف الشركات المفتوحة (Greenhouse / Lever) -------------------
+# واجهات JSON عامة مخصصة للقراءة الآلية. أضف شركات جديدة بصيغة "greenhouse:token" أو "lever:token"
+# عبر متغير COMPANY_BOARDS في .env (مفصولة بفواصل).
+DEFAULT_COMPANY_BOARDS = ["greenhouse:fervoenergy", "greenhouse:quaise"]
+
+
+def company_boards() -> List[str]:
+    import os
+    extra = [x.strip() for x in os.getenv("COMPANY_BOARDS", "").split(",") if x.strip()]
+    return DEFAULT_COMPANY_BOARDS + [x for x in extra if x not in DEFAULT_COMPANY_BOARDS]
+
+
+def parse_greenhouse(token: str, data: dict) -> List[Dict]:
+    return [_make(j.get("title", ""), j.get("absolute_url", ""), token.title(),
+                  (j.get("location") or {}).get("name", "دولي"), None, j.get("title", ""), f"Greenhouse/{token}")
+            for j in data.get("jobs", [])]
+
+
+def parse_lever(token: str, data: list) -> List[Dict]:
+    return [_make(j.get("text", ""), j.get("hostedUrl", ""), token.title(),
+                  (j.get("categories") or {}).get("location", "دولي"), None,
+                  f"{j.get('text', '')} {j.get('descriptionPlain', '')[:400]}", f"Lever/{token}") for j in data]
+
+
+def fetch_company_boards() -> List[Dict]:
+    results, failures, boards = [], 0, company_boards()
+    for b in boards:
+        kind, _, token = b.partition(":")
+        try:
+            if kind == "greenhouse":
+                r = _get(f"https://boards-api.greenhouse.io/v1/boards/{token}/jobs")
+                results += parse_greenhouse(token, r.json()) if r else []
+            elif kind == "lever":
+                r = _get(f"https://api.lever.co/v0/postings/{token}", {"mode": "json"})
+                results += parse_lever(token, r.json()) if r else []
+            if not r:
+                failures += 1
+        except Exception as e:
+            logger.warning(f"board {b} failed: {e}")
+            failures += 1
+    if boards and failures == len(boards):
+        raise RuntimeError("company boards unreachable")
+    return results
+
+
+# ------------------- Adzuna (واجهة رسمية، تتطلب مفتاحاً مجانياً) -------------------
+ADZUNA_COUNTRIES = ["gb", "de", "fr", "it", "nl", "at", "pl", "us", "ca", "au", "br", "ch", "be", "es"]
+
+
+def parse_adzuna(country: str, data: dict) -> List[Dict]:
+    out = []
+    for j in data.get("results", []):
+        out.append(_make(j.get("title", ""), j.get("redirect_url", ""), (j.get("company") or {}).get("display_name", ""),
+                         (j.get("location") or {}).get("display_name", country.upper()), None,
+                         j.get("description", ""), "Adzuna"))
+    return out
+
+
+def fetch_adzuna() -> List[Dict]:
+    import os
+    app_id, app_key = os.getenv("ADZUNA_APP_ID", ""), os.getenv("ADZUNA_APP_KEY", "")
+    if not (app_id and app_key):
+        raise SourceSkipped("set ADZUNA_APP_ID / ADZUNA_APP_KEY in .env (free key at developer.adzuna.com)")
+    jobs = [(c, q) for c in ADZUNA_COUNTRIES for q in ("phd reservoir", "internship petroleum", "phd CCUS geothermal hydrogen storage")]
+
+    def one(cq):
+        c, q = cq
+        r = _get(f"https://api.adzuna.com/v1/api/jobs/{c}/search/1",
+                 {"app_id": app_id, "app_key": app_key, "what": q, "results_per_page": 50, "content-type": "application/json"})
+        return parse_adzuna(c, r.json()) if r else None
+
+    results, failures = [], 0
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
+        for res in ex.map(one, jobs):
+            if res is None:
+                failures += 1
+            else:
+                results += res
+    if failures == len(jobs):
+        raise RuntimeError("Adzuna unreachable or key invalid")
+    return results
+
+
 SOURCES: Dict[str, Callable[[], List[Dict]]] = {
+    "Adzuna": fetch_adzuna,
+    "CompanyBoards": fetch_company_boards,
     "Arbeitnow": fetch_arbeitnow,
     "jobs.ac.uk": fetch_jobsac,
     "EURAXESS": fetch_euraxess,
@@ -243,6 +332,8 @@ def fetch_live_opportunities() -> Tuple[List[Dict], Dict[str, str]]:
             rel = filter_relevant(raw)
             status[name] = f"ok: {len(raw)} scanned, {len(rel)} relevant"
             found += rel
+        except SourceSkipped as e:
+            status[name] = f"skipped: {e}"
         except Exception as e:  # عزل الأعطال
             logger.warning(f"source {name} failed: {e}")
             status[name] = f"FAILED: {e}"

@@ -42,3 +42,14 @@ def test_arbeitnow_company_source():
                       "location": "Berlin", "tags": [], "description": "<p>thesis on geothermal</p>"}]}
     kept = filter_relevant(parse_arbeitnow(data))
     assert kept and kept[0]["institution"] == "NewCo GmbH"
+
+
+def test_company_boards_and_adzuna_parsers():
+    from scrapers.live_sources import parse_greenhouse, parse_lever, parse_adzuna
+    gh = parse_greenhouse("fervoenergy", {"jobs": [{"title": "Geothermal Reservoir Engineering Intern",
+                          "absolute_url": "https://x/1", "location": {"name": "Houston"}}]})
+    assert filter_relevant(gh)[0]["institution"] == "Fervoenergy"
+    lv = parse_lever("acme", [{"text": "Graduate Subsurface Engineer", "hostedUrl": "https://y", "categories": {"location": "Oslo"}, "descriptionPlain": "reservoir"}])
+    assert filter_relevant(lv)
+    ad = parse_adzuna("gb", {"results": [{"title": "PhD CO2 storage", "redirect_url": "https://z", "company": {"display_name": "Co"}, "location": {"display_name": "Leeds"}, "description": "phd"}]})
+    assert filter_relevant(ad)[0]["country"] == "Leeds"
