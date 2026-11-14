@@ -136,7 +136,7 @@ GLOBAL_COMPREHENSIVE_CATALOG: List[Dict] = [
         "monthly_salary": "~2,450 € صافي شهرياً (14 راتباً في السنة بنظام النمسا)",
         "is_funded": "نعم (وظيفة موظف باحث حكومي براتب نمساوي كامل)",
         "seats": "1 مقعد مخصص للمختبر",
-        "raw_link": "https://geoenergy.engineering/index.php?id=open-positions"
+        "raw_link": "https://www.unileoben.ac.at/en/jobs/"
     },
     {
         "title": "PhD Fellowship: Multi-Phase Flow and Underground Gas Sequestration in Depleted Fields",

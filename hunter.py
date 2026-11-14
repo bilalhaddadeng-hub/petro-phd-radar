@@ -32,7 +32,7 @@ HUNTING_TARGETS = [
     {"name": "SLB Early Careers & R&D Hub", "url": "https://careers.slb.com/early-careers", "category": "CORPORATE_RD"},
     {"name": "TotalEnergies Student & R&D CIFRE Doctorates", "url": "https://totalenergies.com/careers", "category": "CORPORATE_RD"},
     {"name": "IFP Energies nouvelles (IFPEN) Theses Portal", "url": "https://theses.ifpen.fr/", "category": "RESEARCH_INSTITUTE"},
-    {"name": "Montanuniversität Leoben - Chair of Reservoir Engineering", "url": "https://geoenergy.engineering/", "category": "RESERVOIR_STORAGE"},
+    {"name": "Montanuniversität Leoben - Chair of Reservoir Engineering", "url": "https://www.unileoben.ac.at/en/jobs/", "category": "RESERVOIR_STORAGE"},
     {"name": "TU Delft Geoscience & Engineering Department", "url": "https://www.tudelft.nl/citg/over-faculteit/afdelingen/geoscience-engineering", "category": "RESERVOIR_STORAGE"},
     {"name": "Heriot-Watt University Institute of GeoEnergy Engineering", "url": "https://www.hw.ac.uk/about/our-schools/energy-geoscience-infrastructure-and-society/research-institutes/geoenergy-engineering", "category": "RESERVOIR_STORAGE"},
     {"name": "KFUPM College of Petroleum Engineering & Geosciences (CPG)", "url": "https://cpg.kfupm.edu.sa/academics/departments/department-of-petroleum-engineering/graduate-programs/", "category": "MIDDLE_EAST"},

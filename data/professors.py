@@ -10,7 +10,7 @@ TOP_PROFESSORS_RADAR: List[Dict] = [
         "institution": "Montanuniversität Leoben (DGE - Department of Geoenergy)",
         "country": "النمسا (Austria)",
         "email": "holger.ott@unileoben.ac.at",
-        "lab_website": "https://geoenergy.engineering/reservoir-engineering/",
+        "lab_website": "https://www.unileoben.ac.at/en/university/departments-and-chairs/geoenergy/",
         "current_projects": "مشاريع ممولة من OMV والاتحاد الأوروبي حول حقن الرغوة الذكية (Smart Foams) وتخزين الهيدروجين الجوفي ومحاكاة موائع المكامن.",
         "open_positions": "مقاعد دكتوراه دورية وظيفية (Universitätsassistent) براتب ~2,450€ صافي.",
         "advice_for_user": "يبحث دوماً عن مهندسي مكامن يتقنون المحاكاة الرقمية أو العمل المخبري. شهادتك الإيطالية ECTS معتمدة فوراً في النمسا دون أي بيروقراطية."
