@@ -14,8 +14,15 @@ from typing import List, Dict, Tuple
 from evaluator import evaluate_for_bilal_haddad
 from database import save_or_update_opportunity, log_hunting_session
 from scrapers.global_deep_crawler import crawl_and_verify_all_opportunities
+from scrapers.live_sources import fetch_live_opportunities
 
 logger = logging.getLogger(__name__)
+
+LAST_SOURCE_STATUS: Dict[str, str] = {}
+
+def set_source_status(st: Dict[str, str]):
+    LAST_SOURCE_STATUS.clear()
+    LAST_SOURCE_STATUS.update(st)
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -86,11 +93,19 @@ def process_single_opportunity(opp: Dict) -> Tuple[Dict, bool, str]:
     else:
         opp["link"] = target_link # الاحتفاظ بالرابط الأساسي
         
-    if not opp.get("acceptance_difficulty"):
-        opp["acceptance_difficulty"] = evaluate_for_bilal_haddad(opp)
-        
-    status, is_new = save_or_update_opportunity(opp)
-    return opp, is_new, status
+    try:
+        if not opp.get("acceptance_difficulty"):
+            ev = evaluate_for_bilal_haddad(
+                opp.get("country", ""), opp.get("institution", ""), opp.get("source_type", ""),
+                opp.get("title", ""), opp.get("sub_specialty", ""))
+            opp["acceptance_difficulty"] = ev["level"]
+            if not opp.get("key_requirements") or opp.get("category") == "LIVE":
+                opp["key_requirements"] = ev["key_requirements"]
+        status, is_new = save_or_update_opportunity(opp)
+        return opp, is_new, status
+    except Exception as e:  # عنصر واحد فاشل لا يوقف الصيد
+        logger.error(f"Skipping opportunity {opp.get('title')!r}: {e}")
+        return opp, False, "ERROR"
 
 def execute_deep_hunt() -> Dict:
     """
@@ -103,6 +118,16 @@ def execute_deep_hunt() -> Dict:
     scanned_sources = len(HUNTING_TARGETS)
     
     opportunities = crawl_and_verify_all_opportunities()
+
+    # القناص الحي: فرص جديدة من مصادر عامة (جامعات وشركات جديدة بلا قائمة مسبقة)
+    source_status = {}
+    try:
+        live, source_status = fetch_live_opportunities()
+        opportunities = opportunities + live
+    except Exception as e:
+        logger.warning(f"Live hunting failed: {e}")
+        source_status = {"live": f"FAILED: {e}"}
+    set_source_status(source_status)
     
     new_caught = 0
     updated_caught = 0
@@ -112,6 +137,8 @@ def execute_deep_hunt() -> Dict:
         results = list(executor.map(process_single_opportunity, opportunities))
 
     for opp, is_new, status in results:
+        if status == "ERROR":
+            continue
         verified_valid += 1
         if is_new:
             new_caught += 1
@@ -123,7 +150,7 @@ def execute_deep_hunt() -> Dict:
         scanned=scanned_sources,
         new_found=new_caught,
         updated=updated_caught,
-        details=f"صيد متوازي شمل {scanned_sources} جهة بحثية، تم فحص {verified_valid} فرصة حية."
+        details=f"كتالوج + قناص حي: {verified_valid} فرصة. المصادر: {json.dumps(source_status, ensure_ascii=False)}"
     )
 
     hunt_result = {
@@ -132,7 +159,8 @@ def execute_deep_hunt() -> Dict:
         "total_monitored": len(opportunities),
         "verified_active": verified_valid,
         "new_caught": new_caught,
-        "updated_caught": updated_caught
+        "updated_caught": updated_caught,
+        "sources": source_status
     }
     logger.info(f"اكتملت جلسة الصيد: {hunt_result}")
     return hunt_result
