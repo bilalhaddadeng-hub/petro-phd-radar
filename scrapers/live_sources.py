@@ -96,12 +96,42 @@ def guess_source_type(title: str, employer: str) -> str:
     return "UNIVERSITY"
 
 
+_COUNTRIES = {
+    "united kingdom": "UK", "uk": "UK", "england": "UK", "scotland": "UK", "wales": "UK",
+    "norway": "Norway", "germany": "Germany", "france": "France", "italy": "Italy",
+    "netherlands": "Netherlands", "spain": "Spain", "portugal": "Portugal", "austria": "Austria",
+    "switzerland": "Switzerland", "denmark": "Denmark", "sweden": "Sweden", "finland": "Finland",
+    "belgium": "Belgium", "poland": "Poland", "hungary": "Hungary", "romania": "Romania",
+    "czech": "Czechia", "ireland": "Ireland", "canada": "Canada", "australia": "Australia",
+    "united states": "USA", "usa": "USA", "saudi": "Saudi Arabia", "united arab": "UAE",
+    "qatar": "Qatar", "kuwait": "Kuwait", "malaysia": "Malaysia", "brazil": "Brazil",
+}
+_CITIES = {
+    "london": "UK", "aberdeen": "UK", "edinburgh": "UK", "cambridge": "UK", "oxford": "UK",
+    "manchester": "UK", "imperial": "UK", "trondheim": "Norway", "stavanger": "Norway",
+    "oslo": "Norway", "berlin": "Germany", "munich": "Germany", "paris": "France",
+    "pau": "France", "milan": "Italy", "rome": "Italy", "turin": "Italy", "delft": "Netherlands",
+    "amsterdam": "Netherlands", "vienna": "Austria", "leoben": "Austria", "zurich": "Switzerland",
+    "houston": "USA", "calgary": "Canada", "perth": "Australia",
+}
+
+
+def normalize_country(location: str) -> str:
+    """يحوّل نص الموقع (مدينة/منطقة) إلى بلد معروف، وإلا "دولي"."""
+    low = (location or "").lower()
+    for table in (_COUNTRIES, _CITIES):
+        for key, val in table.items():
+            if key in low:
+                return val
+    return "دولي"
+
+
 def _make(title, link, employer, location, deadline, snippet, source) -> Dict:
     return {
         "title": re.sub(r"\s+", " ", title).strip(),
         "link": link,
         "institution": employer or "جهة غير محددة",
-        "country": location or "دولي",
+        "country": normalize_country(location),
         "source_type": guess_source_type(title, employer or ""),
         "sub_specialty": (snippet[:120] or title)[:120],
         "deadline": deadline or "مفتوح حتى ملء الشواغر",
@@ -270,10 +300,15 @@ ADZUNA_COUNTRIES = ["gb", "de", "fr", "it", "nl", "at", "pl", "us", "ca", "au", 
 
 def parse_adzuna(country: str, data: dict) -> List[Dict]:
     out = []
+    codes = {"gb": "UK", "us": "USA", "ca": "Canada", "au": "Australia", "de": "Germany", "fr": "France",
+             "it": "Italy", "nl": "Netherlands", "at": "Austria", "ch": "Switzerland", "pl": "Poland",
+             "es": "Spain", "be": "Belgium", "br": "Brazil"}
     for j in data.get("results", []):
-        out.append(_make(j.get("title", ""), j.get("redirect_url", ""), (j.get("company") or {}).get("display_name", ""),
-                         (j.get("location") or {}).get("display_name", country.upper()), None,
-                         j.get("description", ""), "Adzuna"))
+        item = _make(j.get("title", ""), j.get("redirect_url", ""), (j.get("company") or {}).get("display_name", ""),
+                     (j.get("location") or {}).get("display_name", ""), None,
+                     j.get("description", ""), "Adzuna")
+        item["country"] = codes.get(country.lower(), item["country"])
+        out.append(item)
     return out
 
 

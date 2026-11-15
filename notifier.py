@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from typing import Dict, List, Optional
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+from fees import display_registration_fee, display_tuition_fee, display_experience
 
 def format_opportunity_card(opp: Dict, tag: str = "", current_idx: int = 0, total_count: int = 0) -> str:
     source_emoji = {
@@ -36,16 +37,17 @@ def format_opportunity_card(opp: Dict, tag: str = "", current_idx: int = 0, tota
 🎯 *1. التخصص الدقيق:* {opp['sub_specialty']}
 💰 *2. التمويل:* {opp['is_funded']}
 💵 *3. الراتب الشهري:* {opp['monthly_salary']}
-🎓 *4. رسوم الدراسة:* {opp['tuition_fee']}
-📝 *5. رسوم التسجيل:* {opp['registration_fee']}
+🎓 *4. رسوم الدراسة:* {display_tuition_fee(opp.get('tuition_fee'))}
+📝 *5. رسوم التسجيل:* {display_registration_fee(opp.get('registration_fee'))}
 👥 *6. عدد المقاعد:* {seats_str}
 ⏱️ *7. مدة العقد / التربص:* {duration_str}
 📅 *تاريخ الإغلاق:* {opp.get('deadline', 'مفتوح حتى ملء الشواغر')}
-💼 *الخبرة المطلوبة:* 0 سنوات (مفتوحة لحديثي التخرج من الماستر R1)
+💼 *الخبرة المطلوبة:* {display_experience(opp.get('experience_required'))}
 {method_block}{reqs_block}
 📊 *تقييم القبول لملف بلال حداد:*
 {opp['acceptance_difficulty']}
 ━━━━━━━━━━━━━━━━━━━━━━
+ℹ️ الرسوم والرواتب تقديرية؛ تحقق دائماً من الصفحة الرسمية قبل التقديم.
 """
     return card.strip()
 

@@ -52,4 +52,10 @@ def test_company_boards_and_adzuna_parsers():
     lv = parse_lever("acme", [{"text": "Graduate Subsurface Engineer", "hostedUrl": "https://y", "categories": {"location": "Oslo"}, "descriptionPlain": "reservoir"}])
     assert filter_relevant(lv)
     ad = parse_adzuna("gb", {"results": [{"title": "PhD CO2 storage", "redirect_url": "https://z", "company": {"display_name": "Co"}, "location": {"display_name": "Leeds"}, "description": "phd"}]})
-    assert filter_relevant(ad)[0]["country"] == "Leeds"
+    assert filter_relevant(ad)[0]["country"] == "UK"
+
+
+def test_normalize_country():
+    from scrapers.live_sources import normalize_country
+    assert normalize_country("Trondheim, Sør-Trøndelag") == "Norway"
+    assert normalize_country("Somewhere unknown") == "دولي"

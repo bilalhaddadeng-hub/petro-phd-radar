@@ -372,7 +372,7 @@ def crawl_and_audit_single_target(target: Dict) -> Dict:
 
 def process_single_opportunity(opp: Dict) -> Tuple[Dict, bool, str]:
     """معالجة وفحص فرصة واحدة وتأكيد سلامة رابطها"""
-    opp["experience_required"] = "0 سنوات (مفتوحة بالكامل لحديثي التخرج من الماستر / Early Stage Researcher)"
+    opp.setdefault("experience_required", "غير محددة، راجع الإعلان")
     target_link = opp.get("link", opp.get("raw_link", ""))
     is_ok, resolved_url = verify_live_url(target_link)
     if is_ok:

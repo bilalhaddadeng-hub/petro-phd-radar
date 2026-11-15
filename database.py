@@ -192,7 +192,7 @@ def save_or_update_opportunity(data: Dict) -> Tuple[str, bool]:
                     row = r
                     break
 
-    exp_req = data.get("experience_required", "0 سنوات (مفتوحة بالكامل لحديثي التخرج من الماستر / Early Stage Researcher)")
+    exp_req = data.get("experience_required", "")
     category = data.get("category", "RESERVOIR_STORAGE")
     key_reqs = data.get("key_requirements", "")
     duration = data.get("duration", "3 إلى 4 سنوات (دكتوراه كاملة)" if data.get("source_type") != "INTERNSHIP_RD" else "6 أشهر (تربص أطروحة ماستر)")
@@ -216,8 +216,8 @@ def save_or_update_opportunity(data: Dict) -> Tuple[str, bool]:
             data.get("source_type", "UNIVERSITY"),
             data.get("sub_specialty", "هندسة بترول عامة"),
             data.get("deadline", "غير محدد"),
-            data.get("tuition_fee", "معفاة بالكامل"),
-            data.get("registration_fee", "رسوم إدارية قياسية"),
+            data.get("tuition_fee", ""),
+            data.get("registration_fee", ""),
             data.get("monthly_salary", "ممولة"),
             data.get("is_funded", "نعم"),
             data.get("seats", "1 مقعد"),
@@ -271,8 +271,8 @@ def save_or_update_opportunity(data: Dict) -> Tuple[str, bool]:
             data.get("institution", "جهة غير محددة"),
             data.get("country", "دولي"),
             data.get("sub_specialty", "هندسة بترول عامة"),
-            data.get("tuition_fee", "معفاة بالكامل"),
-            data.get("registration_fee", "رسوم إدارية قياسية"),
+            data.get("tuition_fee", ""),
+            data.get("registration_fee", ""),
             data.get("monthly_salary", "ممولة"),
             data.get("is_funded", "نعم"),
             data.get("seats", "1 مقعد"),

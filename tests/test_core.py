@@ -75,3 +75,11 @@ def test_callback_data_fits_64_bytes():
     data = f"trk:{'a' * 16}:{key}:99"
     assert len(data.encode()) <= 64
     assert bot.resolve_cat(key) == cat
+
+
+def test_fee_display_never_claims_unverified_zero():
+    from fees import display_registration_fee as r, display_tuition_fee as t
+    assert "غير مؤكدة" in r("0 €")
+    assert "غير مؤكدة" in r("")
+    assert "تقدير" in r("حوالي 30 €")
+    assert "حسب شروط التمويل" in t("0 € (معفاة بالكامل)")
