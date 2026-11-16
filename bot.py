@@ -901,7 +901,8 @@ def main():
         logger.info(f"تمت جدولة المنبه اليومي عند الساعة {DAILY_REPORT_HOUR:02d}:{DAILY_REPORT_MINUTE:02d} يومياً.")
 
     logger.info("البوت جاهز ويعمل بكفاءة...")
-    app.run_polling()
+    # allowed_updates صريح: Telegram يتذكر آخر إعداد، وقد يستبعد الرسائل إن ضبطه برنامج سابق
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
     main()
