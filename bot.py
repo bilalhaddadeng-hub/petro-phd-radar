@@ -21,6 +21,7 @@ from telegram.ext import (
     CommandHandler,
     MessageHandler,
     CallbackQueryHandler,
+    TypeHandler,
     ContextTypes,
     filters
 )
@@ -827,6 +828,13 @@ async def initial_hunt_job(context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.warning(f"Initial hunt warning: {e}")
 
+async def log_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """سجل خفيف لكل تحديث وارد (بدون نص الرسالة الكامل) لتشخيص غياب الرد."""
+    u, c = update.effective_user, update.effective_chat
+    kind = "callback" if update.callback_query else "message"
+    cmd = ((update.message.text or "").split()[0][:20] if update.message and update.message.text else "")
+    logger.info(f"update {kind} chat={c.id if c else None} user=@{(u.username if u else '') or '-'} cmd={cmd}")
+
 async def on_error(update, context: ContextTypes.DEFAULT_TYPE):
     logger.error("Unhandled error", exc_info=context.error)
 
@@ -853,6 +861,7 @@ def main():
 
     app = ApplicationBuilder().token(require_token()).post_init(post_init).build()
 
+    app.add_handler(TypeHandler(Update, log_update), group=-1)
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("auth", cmd_auth))
     app.add_handler(CommandHandler("access", cmd_auth))
