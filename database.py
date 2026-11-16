@@ -95,6 +95,14 @@ def init_db():
         PRIMARY KEY (chat_id, opp_id)
     )
     """)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS user_sources (
+        url TEXT PRIMARY KEY,
+        kind TEXT NOT NULL DEFAULT 'jobs',
+        added_by TEXT,
+        added_at TEXT
+    )
+    """)
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_opp_status ON opportunities(status)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_opp_deadline ON opportunities(deadline)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_fav_chat ON favorites(chat_id)")
@@ -125,6 +133,35 @@ def authorize_user(chat_id: str, username: str = "", first_name: str = ""):
     """, (str(chat_id), username, first_name, now_str))
     conn.commit()
     conn.close()
+
+def add_user_source(url: str, kind: str = "jobs", added_by: str = "") -> bool:
+    conn = get_connection()
+    try:
+        cur = conn.execute("INSERT OR IGNORE INTO user_sources (url, kind, added_by, added_at) VALUES (?, ?, ?, ?)",
+                           (url, kind, str(added_by), datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")))
+        conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()
+
+
+def remove_user_source(url: str) -> bool:
+    conn = get_connection()
+    try:
+        cur = conn.execute("DELETE FROM user_sources WHERE url = ?", (url,))
+        conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()
+
+
+def list_user_sources() -> List[Dict]:
+    conn = get_connection()
+    try:
+        return [dict(r) for r in conn.execute("SELECT url, kind FROM user_sources ORDER BY added_at").fetchall()]
+    finally:
+        conn.close()
+
 
 def try_claim_slot(chat_id: str, username: str = "", first_name: str = "") -> bool:
     """يمنح مقعداً لمن يضغط /start إن بقي مقعد (المالك + مقعد واحد افتراضياً)، وإلا يرفض. ذرّي."""

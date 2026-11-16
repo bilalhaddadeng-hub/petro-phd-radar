@@ -11,7 +11,7 @@ import logging
 import re
 from datetime import date, datetime, timedelta
 from typing import Callable, Dict, List, Optional, Tuple
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -42,6 +42,10 @@ LEVEL_TERMS = [
 EXCLUDE_TERMS = ["senior ", "head of", "professor of", "associate professor", "full professor", "chair of", "director",
                  "postdoc", "post-doc", "post doc", "postdoctoral", "post-doctoral", "assistant professor", "lecturer",
                  "principal ", "manager", "vice president"]
+
+# ضجيج لغوي: "reservoir" في الطب/الحاسوب لا علاقة له بالمكامن
+NOISE_TERMS = ["hiv", "siv ", "reservoir computing", "quantum reservoir", "viral reservoir", "latent reservoir",
+               "zoonotic", "mosquito", "cancer", "tumor", "tumour", "clinical", "neuroscience"]
 
 SEARCH_QUERIES = [
     "reservoir engineering", "petroleum engineering", "CCUS", "CO2 storage", "carbon capture storage",
@@ -109,6 +113,8 @@ def relevance(title: str, snippet: str = "") -> Tuple[int, bool]:
     """(درجة الصلة بالموضوع، هل المستوى مناسب)."""
     text = f" {title} {snippet} ".lower()
     title_l = f" {title} ".lower()
+    if any(n in text for n in NOISE_TERMS):
+        return 0, False
     score = sum(2 if t in title_l else 1 for t in TOPIC_TERMS if t in text)
     level_ok = any(t in text for t in LEVEL_TERMS) and not any(t in title_l for t in EXCLUDE_TERMS)
     return score, level_ok
@@ -250,6 +256,159 @@ def fetch_nature() -> List[Dict]:
             results += parse_nature(r.text)
     if failures == len(NATURE_PAGES):
         raise RuntimeError("Nature Careers unreachable")
+    return results
+
+
+# ------------------------------ EGU Jobs (إعلانات علوم الأرض الأوروبية) ------------------------------
+EGU_PAGES = ["https://www.egu.eu/jobs/", "https://www.egu.eu/ere/jobs/", "https://www.egu.eu/hs/jobs/",
+             "https://www.egu.eu/ssp/jobs/", "https://www.egu.eu/gmpv/jobs/", "https://www.egu.eu/ts/jobs/",
+             "https://www.egu.eu/gm/jobs/", "https://www.egu.eu/sm/jobs/"]
+
+
+def parse_egu(html: str) -> List[Dict]:
+    soup = BeautifulSoup(html, "html.parser")
+    out, seen = [], set()
+    for a in soup.find_all("a", href=re.compile(r"^/jobs/\d+/")):
+        title = a.get_text(" ", strip=True)
+        if len(title) < 12 or a["href"] in seen:
+            continue
+        seen.add(a["href"])
+        out.append(_make(title, urljoin("https://www.egu.eu", a["href"]), "", "", None, title, "EGU Jobs"))
+    return out
+
+
+def fetch_egu() -> List[Dict]:
+    def one(u):
+        r = _get_retry(u)
+        return parse_egu(r.text) if r else None
+
+    results, failures = [], 0
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as ex:
+        for res in ex.map(one, EGU_PAGES):
+            if res is None:
+                failures += 1
+            else:
+                results += res
+    if failures == len(EGU_PAGES):
+        raise RuntimeError("EGU unreachable")
+    return results
+
+
+# ------------------------------ jobRxiv (لوحة وظائف علمية مفتوحة) ------------------------------
+def parse_jobrxiv(html: str) -> List[Dict]:
+    soup = BeautifulSoup(html, "html.parser")
+    out, seen = [], set()
+    for a in soup.find_all("a", href=re.compile(r"jobrxiv\.org/(job/|\?post_type=job_listing)")):
+        title = a.get_text(" ", strip=True)
+        if len(title) < 15 or a["href"] in seen:
+            continue
+        seen.add(a["href"])
+        out.append(_make(title, a["href"], "", "", None, title, "jobRxiv"))
+    return out
+
+
+def fetch_jobrxiv() -> List[Dict]:
+    queries = SEARCH_QUERIES + EXTRA_QUERIES[:6]
+
+    def one(q):
+        r = _get_retry("https://jobrxiv.org/", {"s": q, "post_type": "job_listing"})
+        return parse_jobrxiv(r.text) if r else None
+
+    results, failures = [], 0
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as ex:
+        for res in ex.map(one, queries):
+            if res is None:
+                failures += 1
+            else:
+                results += res
+    if failures == len(queries):
+        raise RuntimeError("jobRxiv unreachable")
+    return results
+
+
+# ------------------------------ قائمة المراقبة: صفحات الجامعات (+ ما تضيفه أنت بـ /addsource) ------------------------------
+# kind=phd: صفحة برامج/نداءات دكتوراه (يكفي موضوع الصلة)، kind=jobs: صفحة وظائف (يلزم مستوى + موضوع)
+DEFAULT_WATCHLIST = [
+    ("https://www.polito.it/en/education/phd-programmes", "phd"),
+    ("https://www.dottorato.polimi.it/en/", "phd"),
+    ("https://www.uniroma1.it/it/pagina/dottorati-di-ricerca", "phd"),
+    ("https://www.unibo.it/en/teaching/phd", "phd"),
+    ("https://www.unipd.it/en/phd-programmes", "phd"),
+    ("https://www.unipi.it/en/phd/", "phd"),
+    ("https://www.unict.it/it/didattica/dottorati-di-ricerca", "phd"),
+    ("https://www.unipa.it/dottorati/", "phd"),
+    ("https://www.uni-miskolc.hu/en/university/organisations/faculties/faculty-of-earth-and-environmental-sciences-and-engineering/", "phd"),
+    ("https://doctorat.upc.edu/en", "phd"),
+    ("https://www.helsinki.fi/en/about-us/careers/open-positions", "jobs"),
+    ("https://www.aalto.fi/en/open-positions", "jobs"),
+    ("https://www.ntnu.edu/vacancies", "jobs"),
+    ("https://www.uib.no/en/about/70536/vacancies", "jobs"),
+    ("https://www.uio.no/english/about/vacancies/", "jobs"),
+    ("https://jobs.ethz.ch/", "jobs"),
+    ("https://www.imperial.ac.uk/jobs/", "jobs"),
+    ("https://www.jobbnorge.no/ledige-stillinger?searchString=reservoir", "jobs"),
+]
+
+
+def is_public_http_url(url: str) -> bool:
+    """يمنع روابط الشبكة الداخلية (SSRF): http/https فقط ونطاق يحلّ إلى عنوان عام."""
+    import ipaddress
+    import socket
+    try:
+        u = urlparse(url)
+        if u.scheme not in ("http", "https") or not u.hostname:
+            return False
+        for info in socket.getaddrinfo(u.hostname, None):
+            ip = ipaddress.ip_address(info[4][0])
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+                return False
+        return True
+    except (OSError, ValueError):
+        return False
+
+
+def parse_watch_page(html: str, base_url: str, kind: str) -> List[Dict]:
+    soup = BeautifulSoup(html, "html.parser")
+    host = re.sub(r"^www\.", "", urlparse(base_url).hostname or "")
+    out, seen = [], set()
+    for a in soup.find_all("a", href=True):
+        title = re.sub(r"\s+", " ", a.get_text(" ", strip=True))
+        href = urljoin(base_url, a["href"].strip())
+        if len(title) < 15 or href in seen or not href.startswith("http"):
+            continue
+        seen.add(href)
+        # في صفحات الدكتوراه نضيف الكلمة المفتاحية ليكفي مطابقة الموضوع
+        is_program = re.search(r"phd|ph\.d|doctor|dottor|programme|program|course|studies|position|call|bando", title, re.I)
+        snippet = f"{title} phd" if (kind == "phd" and is_program) else title
+        out.append(_make(title, href, host, "", None, snippet, f"Watch:{host}"))
+    return out
+
+
+def fetch_watchlist() -> List[Dict]:
+    items = list(DEFAULT_WATCHLIST)
+    try:
+        from database import list_user_sources
+        items += [(r["url"], r["kind"]) for r in list_user_sources()]
+    except Exception as e:  # قاعدة البيانات غير جاهزة: نكتفي بالقائمة الافتراضية
+        logger.warning(f"user sources unavailable: {e}")
+
+    def one(it):
+        url, kind = it
+        if not is_public_http_url(url):
+            return None
+        r = _get_retry(url)
+        return parse_watch_page(r.text, url, kind) if r else None
+
+    results, failures = [], 0
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
+        for res in ex.map(one, items):
+            if res is None:
+                failures += 1
+            else:
+                results += res
+    if failures == len(items):
+        raise RuntimeError("watchlist unreachable")
+    NOTES["Watchlist"] = f"{len(items) - failures}/{len(items)} pages reachable"
     return results
 
 
@@ -548,6 +707,9 @@ SOURCES: Dict[str, Callable[[], List[Dict]]] = {
     "EURAXESS": fetch_euraxess,
     "CORDIS": fetch_cordis,
     "NatureCareers": fetch_nature,
+    "EGUJobs": fetch_egu,
+    "jobRxiv": fetch_jobrxiv,
+    "Watchlist": fetch_watchlist,
 }
 
 

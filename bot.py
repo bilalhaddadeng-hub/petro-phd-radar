@@ -71,7 +71,10 @@ from database import (
     close_expired_opportunities,
     get_stats,
     get_favorite_reminders,
-    get_latest_portal_audits
+    get_latest_portal_audits,
+    add_user_source,
+    remove_user_source,
+    list_user_sources
 )
 from hunter import execute_deep_hunt, HUNTING_TARGETS
 from data.professors import TOP_PROFESSORS_RADAR
@@ -838,6 +841,50 @@ async def log_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def on_error(update, context: ContextTypes.DEFAULT_TYPE):
     logger.error("Unhandled error", exc_info=context.error)
 
+
+@_guard
+async def cmd_addsource(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/addsource <رابط> [phd|jobs] : يضيف صفحة إلى قائمة المراقبة اليومية."""
+    from scrapers.live_sources import is_public_http_url
+    args = context.args or []
+    if not args:
+        await safe_send(context.bot, update.effective_chat.id,
+                        "الاستخدام: `/addsource الرابط phd` لصفحة برامج دكتوراه، أو `/addsource الرابط jobs` لصفحة وظائف.",
+                        parse_mode="Markdown")
+        return
+    url = args[0].strip()
+    kind = args[1].lower() if len(args) > 1 and args[1].lower() in ("phd", "jobs") else "jobs"
+    loop = asyncio.get_running_loop()
+    ok = await loop.run_in_executor(None, is_public_http_url, url)
+    if not ok:
+        await safe_send(context.bot, update.effective_chat.id, "❌ رابط غير صالح (يجب أن يكون http/https عاماً).")
+        return
+    if len(list_user_sources()) >= 50:
+        await safe_send(context.bot, update.effective_chat.id, "❌ بلغتَ الحد الأقصى (50 مصدراً). احذف بعضها بـ /delsource.")
+        return
+    added = add_user_source(url, kind, str(update.effective_chat.id))
+    await safe_send(context.bot, update.effective_chat.id,
+                    "✅ أُضيف المصدر وسيُفحص في الصيد القادم." if added else "ℹ️ هذا المصدر مضاف من قبل.",
+                    disable_web_page_preview=True)
+
+
+@_guard
+async def cmd_sources(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    from scrapers.live_sources import DEFAULT_WATCHLIST
+    mine = list_user_sources()
+    lines = [f"🔭 *قائمة المراقبة:* {len(DEFAULT_WATCHLIST)} صفحة افتراضية + {len(mine)} أضفتَها أنت."]
+    lines += [f"• ({s['kind']}) {s['url']}" for s in mine[:40]] or ["لا مصادر مضافة بعد. أضف بـ `/addsource الرابط`."]
+    await safe_send(context.bot, update.effective_chat.id, "\n".join(lines), disable_web_page_preview=True)
+
+
+@_guard
+async def cmd_delsource(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await safe_send(context.bot, update.effective_chat.id, "الاستخدام: `/delsource الرابط`", parse_mode="Markdown")
+        return
+    done = remove_user_source(context.args[0].strip())
+    await safe_send(context.bot, update.effective_chat.id, "🗑️ حُذف." if done else "لم أجد هذا الرابط في مصادرك.")
+
 async def post_init(app):
     # أي webhook قديم يمنع getUpdates (Conflict) فيدخل البوت في حلقة أخطاء
     try:
@@ -859,6 +906,8 @@ async def post_init(app):
         BotCommand("export", "تصدير المفضلة CSV"),
         BotCommand("stats", "إحصاءات الرادار"),
         BotCommand("hunt", "صيد فوري"),
+        BotCommand("addsource", "أضف موقعاً للمراقبة"),
+        BotCommand("sources", "مواقعي المراقَبة"),
         BotCommand("help", "المساعدة"),
     ])
 
@@ -885,6 +934,9 @@ def main():
     app.add_handler(CommandHandler("fav", cmd_favorites))
     app.add_handler(CommandHandler("hunt", cmd_hunter_hub))
     app.add_handler(CommandHandler("professors", cmd_professors))
+    app.add_handler(CommandHandler("addsource", cmd_addsource))
+    app.add_handler(CommandHandler("sources", cmd_sources))
+    app.add_handler(CommandHandler("delsource", cmd_delsource))
     app.add_handler(CallbackQueryHandler(handle_callbacks))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_user_text))
     app.add_error_handler(on_error)

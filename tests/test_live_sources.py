@@ -80,3 +80,21 @@ def test_parse_nature_item():
     out = parse_nature(html)
     assert out[0]["link"] == "https://www.nature.com/naturecareers/job/1/x/"
     assert "reservoir" in out[0]["title"]
+
+
+def test_ssrf_guard_and_watch_parse():
+    from scrapers.live_sources import is_public_http_url, parse_watch_page, filter_relevant
+    assert not is_public_http_url("http://127.0.0.1:8000/x")
+    assert not is_public_http_url("file:///etc/passwd")
+    assert not is_public_http_url("http://localhost/")
+    html = ('<a href="/p1">PhD position in reservoir simulation and CO2 storage</a>'
+            '<a href="/p2">Double degree partner: Ufa Petroleum University site</a>')
+    items = parse_watch_page(html, "https://uni.example.edu/jobs", "phd")
+    titles = [i["title"] for i in filter_relevant(items)]
+    assert any("reservoir simulation" in t for t in titles)
+    assert not any("Ufa" in t for t in titles)
+
+
+def test_noise_filter_drops_medical_reservoir():
+    from scrapers.live_sources import relevance
+    assert relevance("PhD position HIV-1 reservoir dynamics")[1] is False
