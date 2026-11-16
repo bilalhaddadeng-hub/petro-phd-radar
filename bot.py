@@ -86,6 +86,9 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO
 )
+# httpx يطبع رابط الطلب كاملاً ومعه التوكن: يُمنع كي لا يتسرب إلى السجلات
+for _noisy in ("httpx", "httpcore"):
+    logging.getLogger(_noisy).setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 # لوحة المفاتيح الرئيسية الثابتة (سهلة وسريعة الوصول)
@@ -825,6 +828,11 @@ async def on_error(update, context: ContextTypes.DEFAULT_TYPE):
     logger.error("Unhandled error", exc_info=context.error)
 
 async def post_init(app):
+    # أي webhook قديم يمنع getUpdates (Conflict) فيدخل البوت في حلقة أخطاء
+    try:
+        await app.bot.delete_webhook(drop_pending_updates=False)
+    except Exception as e:
+        logger.warning(f"delete_webhook failed: {e}")
     await app.bot.set_my_commands([
         BotCommand("start", "القائمة الرئيسية"),
         BotCommand("deadlines", "الفرص القريبة الإغلاق"),
