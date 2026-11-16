@@ -35,9 +35,13 @@ TOPIC_TERMS = [
 LEVEL_TERMS = [
     "phd", "ph.d", "doctoral", "doctorate", "studentship", "dottorato", "doctorat", "thesis", "internship",
     "intern ", "trainee", "graduate", "early stage researcher", "esr", "research assistant", "junior",
-    "fellowship", "msc project", "master project", "stage ",
+    "fellowship", "msc project", "master project", "stage ", "researcher", "scholarship", "bolsa", "borsa",
+    "assegno", "doctoral candidate", "early-stage", "early career", "apprentice", "co-op", "working student",
+    "praktikum", "werkstudent", "stagiaire", "tirocinio",
 ]
-EXCLUDE_TERMS = ["senior ", "head of", "professor of", "associate professor", "full professor", "chair of", "director"]
+EXCLUDE_TERMS = ["senior ", "head of", "professor of", "associate professor", "full professor", "chair of", "director",
+                 "postdoc", "post-doc", "post doc", "postdoctoral", "post-doctoral", "assistant professor", "lecturer",
+                 "principal ", "manager", "vice president"]
 
 SEARCH_QUERIES = [
     "reservoir engineering", "petroleum engineering", "CCUS", "CO2 storage", "carbon capture storage",
@@ -57,6 +61,22 @@ def _get(url: str, params: Optional[dict] = None, timeout: int = 20) -> Optional
     except requests.RequestException as e:
         logger.warning(f"live fetch failed {url}: {e}")
         return None
+
+
+def _get_retry(url: str, params: Optional[dict] = None, tries: int = 3) -> Optional[requests.Response]:
+    """طلب مع انتظار قصير عند 429 (حد المعدل): نحترم الخادم ولا نتجاوزه."""
+    import time
+    for i in range(tries):
+        try:
+            r = requests.get(url, params=params, headers=HEADERS, timeout=20)
+        except requests.RequestException:
+            return None
+        if r.status_code == 200:
+            return r
+        if r.status_code != 429:
+            return None
+        time.sleep(2 * (i + 1))
+    return None
 
 
 def parse_closing_date(text: str, today: Optional[date] = None) -> Optional[str]:
@@ -201,20 +221,26 @@ def parse_euraxess(html: str) -> List[Dict]:
     return out
 
 
-def fetch_euraxess(pages: int = 80) -> List[Dict]:
-    # EURAXESS لا يطبّق فلتر الكلمات من الرابط، لذا نقرأ أحدث الصفحات ونصفّي محلياً
-    def one(p):
-        r = _get("https://euraxess.ec.europa.eu/jobs/search", {"page": p})
+def fetch_euraxess(pages: int = 3, recent_pages: int = 15) -> List[Dict]:
+    """بحث EURAXESS الرسمي بالكلمة المفتاحية (f[0]=keywords:...) + أحدث الصفحات، بوتيرة هادئة."""
+    import time
+
+    def one(params):
+        time.sleep(1.2)  # رفق بالخادم: تجنباً لحد المعدل 429
+        r = _get_retry("https://euraxess.ec.europa.eu/jobs/search", params)
         return parse_euraxess(r.text) if r else None
 
+    jobs = [{"f[0]": f"keywords:{q}", "page": p} for q in SEARCH_QUERIES for p in range(pages)]
+    jobs += [{"page": p} for p in range(recent_pages)]
+
     results, failures = [], 0
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
-        for res in ex.map(one, range(pages)):
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+        for res in ex.map(one, jobs):
             if res is None:
                 failures += 1
             else:
                 results += res
-    if failures == pages:
+    if failures == len(jobs):
         raise RuntimeError("EURAXESS unreachable")
     return results
 
@@ -252,7 +278,14 @@ def fetch_arbeitnow(pages: int = 6) -> List[Dict]:
 # ------------------- لوحات توظيف الشركات المفتوحة (Greenhouse / Lever) -------------------
 # واجهات JSON عامة مخصصة للقراءة الآلية. أضف شركات جديدة بصيغة "greenhouse:token" أو "lever:token"
 # عبر متغير COMPANY_BOARDS في .env (مفصولة بفواصل).
-DEFAULT_COMPANY_BOARDS = ["greenhouse:fervoenergy", "greenhouse:quaise"]
+# الصيغ: greenhouse:token | lever:token | ashby:token | smartrecruiters:token | workable:token
+#        workday:tenant:N:site   (مثال: workday:bakerhughes:5:BakerHughes)
+DEFAULT_COMPANY_BOARDS = [
+    "greenhouse:fervoenergy", "greenhouse:quaise", "greenhouse:cognite",
+    "smartrecruiters:ormat", "smartrecruiters:mazama", "workable:1pointfive", "workable:slb",
+    "workday:bakerhughes:5:BakerHughes",
+]
+WORKDAY_QUERIES = ["reservoir", "subsurface", "graduate", "intern", "geoscience", "carbon storage"]
 
 
 def company_boards() -> List[str]:
@@ -273,22 +306,90 @@ def parse_lever(token: str, data: list) -> List[Dict]:
                   f"{j.get('text', '')} {j.get('descriptionPlain', '')[:400]}", f"Lever/{token}") for j in data]
 
 
-def fetch_company_boards() -> List[Dict]:
-    results, failures, boards = [], 0, company_boards()
-    for b in boards:
-        kind, _, token = b.partition(":")
+def parse_ashby(token: str, data: dict) -> List[Dict]:
+    return [_make(j.get("title", ""), j.get("jobUrl", ""), token.title(), j.get("location", "") or "دولي", None,
+                  f"{j.get('title', '')} {(j.get('descriptionPlain') or '')[:400]}", f"Ashby/{token}")
+            for j in data.get("jobs", [])]
+
+
+def parse_smartrecruiters(token: str, data: dict) -> List[Dict]:
+    out = []
+    for j in data.get("content", []):
+        loc = j.get("location") or {}
+        out.append(_make(j.get("name", ""), f"https://jobs.smartrecruiters.com/{token}/{j.get('id', '')}",
+                         (j.get("company") or {}).get("name", token.title()),
+                         f"{loc.get('city', '')} {loc.get('country', '')}", None, j.get("name", ""),
+                         f"SmartRecruiters/{token}"))
+    return out
+
+
+def parse_workable(token: str, data: dict) -> List[Dict]:
+    return [_make(j.get("title", ""), j.get("url") or j.get("shortlink", ""), data.get("name", token.title()),
+                  f"{j.get('city', '')} {j.get('country', '')}", None, j.get("title", ""), f"Workable/{token}")
+            for j in data.get("jobs", [])]
+
+
+def parse_workday(tenant: str, n: str, site: str, data: dict) -> List[Dict]:
+    out = []
+    for j in data.get("jobPostings", []):
+        out.append(_make(j.get("title", ""), f"https://{tenant}.wd{n}.myworkdayjobs.com/{site}{j.get('externalPath', '')}",
+                         tenant.title(), j.get("locationsText", "") or "دولي", None, j.get("title", ""),
+                         f"Workday/{tenant}"))
+    return out
+
+
+def _fetch_workday(tenant: str, n: str, site: str) -> Optional[List[Dict]]:
+    url = f"https://{tenant}.wd{n}.myworkdayjobs.com/wday/cxs/{tenant}/{site}/jobs"
+    out, ok = [], False
+    for q in WORKDAY_QUERIES:
         try:
-            if kind == "greenhouse":
-                r = _get(f"https://boards-api.greenhouse.io/v1/boards/{token}/jobs")
-                results += parse_greenhouse(token, r.json()) if r else []
-            elif kind == "lever":
-                r = _get(f"https://api.lever.co/v0/postings/{token}", {"mode": "json"})
-                results += parse_lever(token, r.json()) if r else []
-            if not r:
+            r = requests.post(url, json={"appliedFacets": {}, "limit": 20, "offset": 0, "searchText": q},
+                              headers={**HEADERS, "Content-Type": "application/json"}, timeout=20)
+        except requests.RequestException:
+            continue
+        if r.status_code == 200:
+            ok = True
+            out += parse_workday(tenant, n, site, r.json())
+    return out if ok else None
+
+
+def _fetch_board(b: str) -> Optional[List[Dict]]:
+    kind, _, rest = b.partition(":")
+    if kind == "workday":
+        tenant, n, site = rest.split(":")
+        return _fetch_workday(tenant, n, site)
+    table = {
+        "greenhouse": (f"https://boards-api.greenhouse.io/v1/boards/{rest}/jobs", None, lambda j: parse_greenhouse(rest, j)),
+        "lever": (f"https://api.lever.co/v0/postings/{rest}", {"mode": "json"}, lambda j: parse_lever(rest, j)),
+        "ashby": (f"https://api.ashbyhq.com/posting-api/job-board/{rest}", None, lambda j: parse_ashby(rest, j)),
+        "smartrecruiters": (f"https://api.smartrecruiters.com/v1/companies/{rest}/postings", {"limit": 100},
+                            lambda j: parse_smartrecruiters(rest, j)),
+        "workable": (f"https://apply.workable.com/api/v1/widget/accounts/{rest}", None, lambda j: parse_workable(rest, j)),
+    }
+    if kind not in table:
+        return None
+    url, params, parser = table[kind]
+    r = _get_retry(url, params)
+    return parser(r.json()) if r else None
+
+
+def _safe_board(b: str) -> Optional[List[Dict]]:
+    try:
+        return _fetch_board(b)
+    except Exception as e:
+        logger.warning(f"board {b} failed: {e}")
+        return None
+
+
+def fetch_company_boards() -> List[Dict]:
+    boards = company_boards()
+    results, failures = [], 0
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
+        for res in ex.map(_safe_board, boards):
+            if res is None:
                 failures += 1
-        except Exception as e:
-            logger.warning(f"board {b} failed: {e}")
-            failures += 1
+            else:
+                results += res
     if boards and failures == len(boards):
         raise RuntimeError("company boards unreachable")
     return results
