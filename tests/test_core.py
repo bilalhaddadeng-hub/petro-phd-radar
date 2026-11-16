@@ -83,3 +83,14 @@ def test_fee_display_never_claims_unverified_zero():
     assert "غير مؤكدة" in r("")
     assert "تقدير" in r("حوالي 30 €")
     assert "حسب شروط التمويل" in t("0 € (معفاة بالكامل)")
+
+
+def test_catalog_audit_marks_unverified():
+    from catalog_audit import apply_audit
+    from rebuild_perfect_database import OPPORTUNITIES_DATA as D
+    out = apply_audit(D)
+    assert len(out) == len(D)
+    assert not any(o["deadline"].startswith("2027") for o in out)
+    miskolc = next(o for o in out if "miskolc" in o["link"])
+    assert "150" in miskolc["registration_fee"]
+    assert D[0]["deadline"].startswith("2027")  # الأصل لا يتغير

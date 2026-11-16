@@ -420,7 +420,8 @@ def execute_deep_hunt() -> Dict:
     portals_online = sum(1 for r in portal_results if r["status"] == 200)
 
     # 2. فحص وتأكيد سلامة فرص قاعدة البيانات
-    active_opps = OPPORTUNITIES_DATA
+    from catalog_audit import apply_audit
+    active_opps = apply_audit(OPPORTUNITIES_DATA)
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
         opp_results = list(executor.map(process_single_opportunity, active_opps))
 
