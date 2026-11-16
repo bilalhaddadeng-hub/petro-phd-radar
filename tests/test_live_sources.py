@@ -71,3 +71,12 @@ def test_parse_cordis_filters_ended_and_non_doctoral():
     ]}}
     out = parse_cordis(data, today=date(2026, 11, 16))
     assert [o["link"] for o in out] == ["https://cordis.europa.eu/project/id/2"]
+
+
+def test_parse_nature_item():
+    from scrapers.live_sources import parse_nature
+    html = ('<ul><li class="lister__item"><h3 class="lister__header"><a href="  /naturecareers/job/1/x/  ">'
+            '<span>PhD in reservoir geoscience</span></a></h3></li></ul>')
+    out = parse_nature(html)
+    assert out[0]["link"] == "https://www.nature.com/naturecareers/job/1/x/"
+    assert "reservoir" in out[0]["title"]

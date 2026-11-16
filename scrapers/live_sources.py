@@ -56,6 +56,9 @@ EXTRA_QUERIES = [
 ]
 
 
+NOTES: Dict[str, str] = {}  # ملاحظات تشخيصية لكل مصدر تُضاف إلى حالة الصيد
+
+
 class SourceSkipped(Exception):
     """مصدر معطّل بإعداد ناقص (ليس عطلاً)."""
 
@@ -212,6 +215,44 @@ def fetch_jobsac() -> List[Dict]:
     return results
 
 
+# ------------------------------ Nature Careers (أقسام علوم الأرض/الهندسة) ------------------------------
+NATURE_PAGES = [
+    "https://www.nature.com/naturecareers/jobs/phd-studentship/earth-sciences/",
+    "https://www.nature.com/naturecareers/jobs/earth-sciences/",
+    "https://www.nature.com/naturecareers/jobs/phd-studentship/engineering/",
+    "https://www.nature.com/naturecareers/jobs/phd-studentship/chemistry/",
+]
+
+
+def parse_nature(html: str) -> List[Dict]:
+    soup = BeautifulSoup(html, "html.parser")
+    out = []
+    for li in soup.select("li.lister__item, div.lister__item"):
+        a = li.select_one("h3.lister__header a[href]")
+        if not a:
+            continue
+        employer = li.select_one(".lister__meta-item--recruiter")
+        loc = li.select_one(".lister__meta-item--location")
+        out.append(_make(a.get_text(" ", strip=True), urljoin("https://www.nature.com", a["href"].strip()),
+                         employer.get_text(" ", strip=True) if employer else "",
+                         loc.get_text(" ", strip=True) if loc else "",
+                         None, li.get_text(" ", strip=True)[:500], "Nature Careers"))
+    return out
+
+
+def fetch_nature() -> List[Dict]:
+    results, failures = [], 0
+    for url in NATURE_PAGES:
+        r = _get(url)
+        if r is None:
+            failures += 1
+        else:
+            results += parse_nature(r.text)
+    if failures == len(NATURE_PAGES):
+        raise RuntimeError("Nature Careers unreachable")
+    return results
+
+
 # ------------------------------ CORDIS (شبكات الدكتوراه الأوروبية MSCA) ------------------------------
 CORDIS_QUERIES = ["reservoir", "CO2 storage", "carbon storage", "hydrogen storage", "geothermal", "porous media",
                   "subsurface", "geomechanics", "petroleum", "CCUS", "multiphase flow", "oil and gas"]
@@ -286,7 +327,7 @@ def fetch_euraxess(pages: int = 3, recent_pages: int = 15) -> List[Dict]:
     import time
 
     def one(params):
-        time.sleep(1.2)  # رفق بالخادم: تجنباً لحد المعدل 429
+        time.sleep(2.0)  # رفق بالخادم: تجنباً لحد المعدل 429
         r = _get_retry("https://euraxess.ec.europa.eu/jobs/search", params)
         return parse_euraxess(r.text) if r else None
 
@@ -302,6 +343,7 @@ def fetch_euraxess(pages: int = 3, recent_pages: int = 15) -> List[Dict]:
                 results += res
     if failures == len(jobs):
         raise RuntimeError("EURAXESS unreachable")
+    NOTES["EURAXESS"] = f"{failures}/{len(jobs)} requests failed, {len({r['title'] for r in results})} unique titles"
     return results
 
 
@@ -505,6 +547,7 @@ SOURCES: Dict[str, Callable[[], List[Dict]]] = {
     "jobs.ac.uk": fetch_jobsac,
     "EURAXESS": fetch_euraxess,
     "CORDIS": fetch_cordis,
+    "NatureCareers": fetch_nature,
 }
 
 
@@ -527,7 +570,8 @@ def fetch_live_opportunities() -> Tuple[List[Dict], Dict[str, str]]:
         try:
             raw = fn()
             rel = filter_relevant(raw)
-            status[name] = f"ok: {len(raw)} scanned, {len(rel)} relevant"
+            note = f" [{NOTES[name]}]" if name in NOTES else ""
+            status[name] = f"ok: {len(raw)} scanned, {len(rel)} relevant{note}"
             found += rel
         except SourceSkipped as e:
             status[name] = f"skipped: {e}"
