@@ -22,8 +22,11 @@ def _csv(name: str) -> list:
 # مالكو البوت المعتمدون تلقائياً (معرّفات الدردشة وأسماء المستخدمين)
 OWNER_CHAT_IDS = [x.strip() for x in os.getenv("OWNER_CHAT_IDS", TELEGRAM_CHAT_ID).split(",") if x.strip()]
 AUTHORIZED_USERNAMES = _csv("AUTHORIZED_USERNAMES")
-# بوت مفتوح لأي مستخدم افتراضياً؛ ضع OPEN_ACCESS=0 لإعادة القفل (يبقى المالك والمعتمدون فقط)
-OPEN_ACCESS = os.getenv("OPEN_ACCESS", "1").strip().lower() not in ("0", "false", "no", "off")
+# سقف المستخدمين: المالك + أول شخص يضغط /start (افتراضياً 2 لا أكثر)
+try:
+    MAX_USERS = int(os.getenv("MAX_USERS", "2"))
+except ValueError:
+    MAX_USERS = 2
 
 
 def require_token() -> str:

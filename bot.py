@@ -61,6 +61,7 @@ from database import (
     get_closing_soon_opportunities,
     mark_as_notified_closing,
     authorize_user,
+    try_claim_slot,
     is_user_authorized,
     cycle_application_status,
     get_application_status,
@@ -190,7 +191,7 @@ async def send_paginated_opportunity(update: Update, context: ContextTypes.DEFAU
 AUTH_LOCKED_TEXT = """
 🔒 *عذراً، هذا الرادار مخصص وخاص.*
 
-هذا البوت مخصص لمالكه فقط. إن كنت المالك فاستخدم رابط الدعوة الخاص بك أو أرسل `/auth <الرمز>`.
+البوت مكتمل العدد (المالك وشخص واحد فقط). إن كنت المالك فأرسل `/auth <الرمز>`.
 """
 
 def check_user_auth(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
@@ -204,12 +205,15 @@ def check_user_auth(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
 
     # التحقق من باراميتر البدء في الرابط العميق: /start <secret>
     if context.args and len(context.args) > 0 and SECRET_ACCESS_TOKEN and hmac.compare_digest(context.args[0].strip(), SECRET_ACCESS_TOKEN):
-        authorize_user(chat_id, username, first_name)
-        return True
+        return try_claim_slot(chat_id, username, first_name)
 
     # التحقق من قاعدة البيانات أو اليوزرنيم المعتمد
     if is_user_authorized(chat_id, username):
         return True
+
+    # أول من يضغط /start بعد المالك ينال المقعد المتبقي (بقدر MAX_USERS)
+    if update.message and (update.message.text or "").startswith("/start"):
+        return try_claim_slot(chat_id, username, first_name)
 
     return False
 
@@ -226,8 +230,7 @@ async def cmd_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if SECRET_ACCESS_TOKEN and not token and SECRET_ACCESS_TOKEN in text:
         token = SECRET_ACCESS_TOKEN
 
-    if SECRET_ACCESS_TOKEN and hmac.compare_digest(token, SECRET_ACCESS_TOKEN):
-        authorize_user(chat_id, username, first_name)
+    if SECRET_ACCESS_TOKEN and hmac.compare_digest(token, SECRET_ACCESS_TOKEN)             and try_claim_slot(chat_id, username, first_name):
         await update.message.reply_text(
             f"🔓 *تم التحقق بنجاح وتفعيل وصولك الحصري يا مهندس {first_name or 'بلال'}!*\n\nأهلاً بك في رادارك الخاص لصيد دكتوراه هندسة البترول والمكامن.",
             parse_mode="Markdown",

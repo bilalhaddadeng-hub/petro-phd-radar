@@ -61,7 +61,6 @@ def test_reminders():
 
 
 def test_auth_owner_only(monkeypatch):
-    monkeypatch.setattr(db, "OPEN_ACCESS", False)
     assert db.is_user_authorized("111", "")
     assert not db.is_user_authorized("999", "stranger")
 
@@ -109,9 +108,12 @@ def test_professors_data_complete():
         assert len(format_professor_card(p, 0, len(P))) < 4000
 
 
-def test_open_access_and_lock(monkeypatch):
-    import database
-    monkeypatch.setattr(database, "OPEN_ACCESS", True)
-    assert database.is_user_authorized("999999", "stranger")
-    monkeypatch.setattr(database, "OPEN_ACCESS", False)
-    assert database.is_user_authorized("111", "")
+def test_two_user_cap(monkeypatch):
+    monkeypatch.setattr(db, "MAX_USERS", 2)
+    monkeypatch.setattr(db, "OWNER_CHAT_IDS", ["111"])
+    conn = db.get_connection(); conn.execute("DELETE FROM authorized_users"); conn.commit(); conn.close()
+    assert db.try_claim_slot("222", "friend", "F")        # المقعد الثاني
+    assert db.try_claim_slot("222", "friend", "F")        # نفس الشخص يبقى
+    assert not db.try_claim_slot("333", "third", "T")     # الثالث مرفوض
+    assert db.try_claim_slot("111", "", "owner")          # المالك دائماً
+    assert not db.is_user_authorized("333", "third")

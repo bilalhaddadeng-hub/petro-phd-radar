@@ -2,7 +2,7 @@ import sqlite3
 import hashlib
 from datetime import datetime, date
 from typing import List, Dict, Optional, Tuple
-from config import DB_PATH, CLOSING_SOON_DAYS, OWNER_CHAT_IDS, AUTHORIZED_USERNAMES, OPEN_ACCESS
+from config import DB_PATH, CLOSING_SOON_DAYS, OWNER_CHAT_IDS, AUTHORIZED_USERNAMES, MAX_USERS
 
 def get_connection():
     conn = sqlite3.connect(DB_PATH, timeout=15)
@@ -126,9 +126,27 @@ def authorize_user(chat_id: str, username: str = "", first_name: str = ""):
     conn.commit()
     conn.close()
 
+def try_claim_slot(chat_id: str, username: str = "", first_name: str = "") -> bool:
+    """يمنح مقعداً لمن يضغط /start إن بقي مقعد (المالك + مقعد واحد افتراضياً)، وإلا يرفض. ذرّي."""
+    chat_id = str(chat_id)
+    conn = get_connection()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        rows = conn.execute("SELECT chat_id FROM authorized_users").fetchall()
+        members = {r[0] for r in rows} | {str(x) for x in OWNER_CHAT_IDS}
+        if chat_id in members or len(members) < MAX_USERS:
+            now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+            conn.execute("INSERT OR REPLACE INTO authorized_users (chat_id, username, first_name, authorized_at) "
+                         "VALUES (?, ?, ?, ?)", (chat_id, username, first_name, now_str))
+            conn.commit()
+            return True
+        conn.rollback()
+        return False
+    finally:
+        conn.close()
+
+
 def is_user_authorized(chat_id: str, username: str = "") -> bool:
-    if OPEN_ACCESS:
-        return True
     if str(chat_id) in OWNER_CHAT_IDS:
         return True
     if username and username.lower().strip().replace("@", "") in AUTHORIZED_USERNAMES:
