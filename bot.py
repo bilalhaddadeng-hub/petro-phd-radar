@@ -844,6 +844,13 @@ async def post_init(app):
         await app.bot.delete_webhook(drop_pending_updates=False)
     except Exception as e:
         logger.warning(f"delete_webhook failed: {e}")
+    try:  # تشخيص: هوية البوت وحالة الـ webhook والتحديثات المعلقة (بدون التوكن)
+        me = await app.bot.get_me()
+        wh = await app.bot.get_webhook_info()
+        logger.info(f"DIAG bot=@{me.username} id={me.id} webhook_url={wh.url or '-'} pending={wh.pending_update_count} "
+                    f"last_error={wh.last_error_message or '-'}")
+    except Exception as e:
+        logger.warning(f"DIAG failed: {e}")
     await app.bot.set_my_commands([
         BotCommand("start", "القائمة الرئيسية"),
         BotCommand("deadlines", "الفرص القريبة الإغلاق"),
