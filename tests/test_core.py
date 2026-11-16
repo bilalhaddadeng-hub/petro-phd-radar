@@ -60,7 +60,8 @@ def test_reminders():
     assert len(r) == 1 and r[0][0] == "1" and r[0][1]["days_left"] == 3
 
 
-def test_auth_owner_only():
+def test_auth_owner_only(monkeypatch):
+    monkeypatch.setattr(db, "OPEN_ACCESS", False)
     assert db.is_user_authorized("111", "")
     assert not db.is_user_authorized("999", "stranger")
 
@@ -106,3 +107,11 @@ def test_professors_data_complete():
         assert need <= set(p) and p["lab_website"].startswith("https://")
         assert "@" in p["email"] or "غير مؤكد" in p["email"]
         assert len(format_professor_card(p, 0, len(P))) < 4000
+
+
+def test_open_access_and_lock(monkeypatch):
+    import database
+    monkeypatch.setattr(database, "OPEN_ACCESS", True)
+    assert database.is_user_authorized("999999", "stranger")
+    monkeypatch.setattr(database, "OPEN_ACCESS", False)
+    assert database.is_user_authorized("111", "")

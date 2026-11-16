@@ -2,7 +2,7 @@ import sqlite3
 import hashlib
 from datetime import datetime, date
 from typing import List, Dict, Optional, Tuple
-from config import DB_PATH, CLOSING_SOON_DAYS, OWNER_CHAT_IDS, AUTHORIZED_USERNAMES
+from config import DB_PATH, CLOSING_SOON_DAYS, OWNER_CHAT_IDS, AUTHORIZED_USERNAMES, OPEN_ACCESS
 
 def get_connection():
     conn = sqlite3.connect(DB_PATH, timeout=15)
@@ -127,6 +127,8 @@ def authorize_user(chat_id: str, username: str = "", first_name: str = ""):
     conn.close()
 
 def is_user_authorized(chat_id: str, username: str = "") -> bool:
+    if OPEN_ACCESS:
+        return True
     if str(chat_id) in OWNER_CHAT_IDS:
         return True
     if username and username.lower().strip().replace("@", "") in AUTHORIZED_USERNAMES:
