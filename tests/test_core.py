@@ -94,3 +94,15 @@ def test_catalog_audit_marks_unverified():
     miskolc = next(o for o in out if "miskolc" in o["link"])
     assert "150" in miskolc["registration_fee"]
     assert D[0]["deadline"].startswith("2027")  # الأصل لا يتغير
+
+
+def test_professors_data_complete():
+    from data.professors import TOP_PROFESSORS_RADAR as P
+    from notifier import format_professor_card
+    need = {"name", "title", "institution", "country", "email", "lab_website",
+            "current_projects", "open_positions", "advice_for_user"}
+    assert len(P) >= 10
+    for p in P:
+        assert need <= set(p) and p["lab_website"].startswith("https://")
+        assert "@" in p["email"] or "غير مؤكد" in p["email"]
+        assert len(format_professor_card(p, 0, len(P))) < 4000

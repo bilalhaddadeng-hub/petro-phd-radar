@@ -1,73 +1,104 @@
-from typing import List, Dict
+# -*- coding: utf-8 -*-
+"""مجموعات وأساتذة أوروبيون في المكامن وتخزين CO2/H2 والتدفق في الأوساط المسامية.
 
-# قاعدة بيانات نخبة الأساتذة ورؤساء المخابر في هندسة البترول والطاقة الجوفية
-# (ممن لديهم ميزانيات Horizon Europe / ERC / مشاريع صناعية جارية ويبحثون دائماً عن مرشحين)
+كل معلومة هنا طابقتُها مع صفحات رسمية أو مصادر منشورة (2026-11). ما لم يثبت يُكتب صراحة
+"غير مؤكد". لا رواتب ولا مواعيد ولا بريد مخمّن: الفرص تُراجع في صفحة المجموعة نفسها،
+فالأساتذة لا يعلنون مقاعد ثابتة طوال العام.
+"""
+from typing import Dict, List
+
+NO_EMAIL = "غير مؤكد، راجع صفحة الأستاذ الرسمية"
+OPEN_NOTE = "تُعلَن المقاعد حسب المشاريع الممولة؛ راجع صفحة المجموعة وEURAXESS، وراسل الأستاذ مباشرة."
+
+
+def _p(name, title, institution, country, site, projects, advice, email=NO_EMAIL, positions=OPEN_NOTE):
+    return {
+        "name": name, "title": title, "institution": institution, "country": country,
+        "email": email, "lab_website": site, "current_projects": projects,
+        "open_positions": positions, "advice_for_user": advice,
+    }
+
 
 TOP_PROFESSORS_RADAR: List[Dict] = [
-    {
-        "name": "Prof. Holger Ott",
-        "title": "Head of Chair of Reservoir Engineering",
-        "institution": "Montanuniversität Leoben (DGE - Department of Geoenergy)",
-        "country": "النمسا (Austria)",
-        "email": "holger.ott@unileoben.ac.at",
-        "lab_website": "https://www.unileoben.ac.at/en/university/departments-and-chairs/geoenergy/",
-        "current_projects": "مشاريع ممولة من OMV والاتحاد الأوروبي حول حقن الرغوة الذكية (Smart Foams) وتخزين الهيدروجين الجوفي ومحاكاة موائع المكامن.",
-        "open_positions": "مقاعد دكتوراه دورية وظيفية (Universitätsassistent) براتب ~2,450€ صافي.",
-        "advice_for_user": "يبحث دوماً عن مهندسي مكامن يتقنون المحاكاة الرقمية أو العمل المخبري. شهادتك الإيطالية ECTS معتمدة فوراً في النمسا دون أي بيروقراطية."
-    },
-    {
-        "name": "Prof. Hadi Hajibeygi",
-        "title": "Professor of Geoscience & Engineering (Subsurface Energy Storage)",
-        "institution": "Delft University of Technology (TU Delft)",
-        "country": "هولندا (Netherlands)",
-        "email": "H.Hajibeygi@tudelft.nl",
-        "lab_website": "https://www.tudelft.nl/citg/over-faculteit/afdelingen/geoscience-engineering",
-        "current_projects": "قائد مشروع ADMIRE ومشروع ELEGANCY (تخزين الهيدروجين والكربون في المكامن الناضبة وحسابات التدفق المتعدد الأطوار).",
-        "open_positions": "مقاعد دكتوراه وظائف بحثية حكومية (PhD Employee) برواتب تبدأ من 2,770€ وتصل إلى 3,539€ شهرياً.",
-        "advice_for_user": "يركز على النمذجة الرياضية (Multiscale Modeling). إذا كان الماستر الإيطالي خاصتك يركز على المحاكاة أو البرمجة (Python/C++/Matlab)، فهذه الوجهة رقم 1 لك."
-    },
-    {
-        "name": "Prof. Laura Valentina & Prof. Dario Viberti",
-        "title": "Professors of Reservoir Engineering & Deep Georesources",
-        "institution": "Politecnico di Torino (DIATI Department)",
-        "country": "إيطاليا (Italy)",
-        "email": "dario.viberti@polito.it",
-        "lab_website": "https://www.diati.polito.it/en/research/research_groups/georesources_and_geomechanics",
-        "current_projects": "شراكات حصرية ضخمة مع عملاق الطاقة الإيطالي ENI في مجال مراقبة وضغط المكامن وتخزين ثاني أكسيد الكربون بحقول شمال إيطاليا والريف الإيطالي والبحر الأدرياتيكي.",
-        "open_positions": "منح PNRR الوطنية + منح دكتوراه صناعية ممولة من ENI بمرتبات 1,250€-1,400€ شهرياً (+50% بالخارج).",
-        "advice_for_user": "أقوى ورقة رابحة في مسارك: أنت في إيطاليا وتستطيع حجز موعد وزيارة مكتب الأستاذ في تورينو شخصياً لمناقشة أطروحة الماستر والدكتوراه القادمة!"
-    },
-    {
-        "name": "Prof. Alberto Guadagnini",
-        "title": "Head of Department of Civil and Environmental Engineering",
-        "institution": "Politecnico di Milano (PoliMi)",
-        "country": "إيطاليا (Italy)",
-        "email": "alberto.guadagnini@polimi.it",
-        "lab_website": "https://www.dica.polimi.it/",
-        "current_projects": "مشاريع أوروبية ودولية في التدفق العشوائي في الأوساط المسامية (Stochastic Multiphase Flow & Uncertainty Quantification).",
-        "open_positions": "منح دكتوراه بحثية ممولة من ميزانيات الاتحاد الأوروبي ووزارة الجامعات MUR.",
-        "advice_for_user": "بما أنك تدرس في إيطاليا، التقديم على PoliMi يعتبر انتقالاً داخلياً سلساً، وتقدير الماستر الإيطالي لديهم مباشر."
-    },
-    {
-        "name": "Prof. Hussein Hoteit",
-        "title": "Professor of Petroleum Engineering & Subsurface Energy Systems",
-        "institution": "KAUST (King Abdullah University of Science and Technology)",
-        "country": "المملكة العربية السعودية (Saudi Arabia)",
-        "email": "hussein.hoteit@kaust.edu.sa",
-        "lab_website": "https://anper.kaust.edu.sa/",
-        "current_projects": "مركز ANPER (أبحاث المكامن المتقدمة وتخزين الطاقة، أرامكو السعودية ومشاريع الذكاء الاصطناعي في هندسة البترول).",
-        "open_positions": "منحة زمالة دكتوراه كاملة 100%: راتب 2,000$ - 2,500$ شهرياً + سكن فيلا فاخر مجاني + تغطية طبية وسفر.",
-        "advice_for_user": "يرحب جداً بالمهندسين المتميزين من شمال أفريقيا وخريجي الجامعات التقنية الإيطالية. يركز على الجمع بين علوم البيانات وهندسة المكامن."
-    },
-    {
-        "name": "Prof. Eric Mackay & Prof. Sebastian Geiger",
-        "title": "Chairs of GeoEnergy Engineering",
-        "institution": "Heriot-Watt University (Institute of GeoEnergy Engineering - IGE)",
-        "country": "بريطانيا (United Kingdom)",
-        "email": "eric.mackay@hw.ac.uk",
-        "lab_website": "https://www.hw.ac.uk/uk/schools/energy-geoscience-infrastructure-society/research/ige.htm",
-        "current_projects": "تحالفات أبحاث تدفق المكامن مع شركات بريطانية وأوروبية (Equinor, Shell, BP, TotalEnergies).",
-        "open_positions": "مقاعد EPSRC ومنح صناعية Industrial Studentships.",
-        "advice_for_user": "المعهد هو الأقدم والأعرق في أوروبا في هندسة البترول (سابقاً Institute of Petroleum Engineering). التواصل معهم بمقترح CCUS يضمن تفاعلاً سريعاً."
-    }
+    _p("Prof. Hadi Hajibeygi", "Subsurface Storage & Multiscale Modeling (Energi Simulation Chair)",
+       "Delft University of Technology (TU Delft)", "هولندا (Netherlands)",
+       "https://tudelft.nl/innovatie-impact/project-cases/subsurface-energy-storage",
+       "يقود برنامج ADMIRE وAdmire Hydrogen Lab لتخزين الهيدروجين الجوفي، ويشارك في DARSim لمحاكاة المكامن، "
+       "وهو Science Lead في IEA TCP 42 للتخزين الجوفي للهيدروجين. (لقبه يختلف بين المصادر: تحقق من صفحة TU Delft.)",
+       "مناسب جداً لملفك إن كان لديك أساس في المحاكاة العددية أو البرمجة. الدكتوراه في هولندا وظيفة براتب نظامي."),
+    _p("Dr./Prof. Denis Voskov", "Reservoir simulation, geothermal & CO2 storage (Open-DARTS)",
+       "Delft University of Technology (TU Delft)", "هولندا (Netherlands)",
+       "https://repository.tudelft.nl/person/academic/Person_ab9a2b39-38b3-4ead-9716-28c86c36d204",
+       "مؤلف المحاكي مفتوح المصدر Open-DARTS لتخزين CO2 والحرارة الجوفية والهيدروجين وتحليل عدم اليقين. "
+       "(لقبه الحالي غير مؤكد من نتائجي.)",
+       "فرصة قوية إن كنت تميل إلى المحاكاة التركيبية والحرارية-التفاعلية."),
+    _p("Prof. Holger Ott", "Head, Chair of Reservoir Engineering & Department Geoenergy",
+       "Montanuniversität Leoben", "النمسا (Austria)",
+       "https://www.dpe.ac.at/people/",
+       "رئيس كرسي هندسة المكامن منذ 2016 ورئيس القسم (Geoenergy). منشورات حديثة في تخزين CO2 والهيدروجين وEOR.",
+       "قوي في التدفق على مستوى المسام والعمل المخبري. تحقق من الوظائف في صفحة الكرسي وموقع الجامعة."),
+    _p("Prof. Dario Viberti", "Full Professor, Reservoir Engineering (DIATI)",
+       "Politecnico di Torino", "إيطاليا (Italy)",
+       "https://www.diati.polito.it/en/research/areas/underground_energy_systems_energy_transition2",
+       "قائد علمي لمشروع صناعي في تخزين CO2 في المكامن الناضبة والطبقات المائية، وضمن مجموعة التخزين الجوفي "
+       "للهيدروجين منذ 2019. يشرف على أطروحات مع Prof. Francesca Verga.",
+       "أنت في إيطاليا، فزيارة تورينو ومناقشة أطروحة أو دكتوراه ممكنة شخصياً. تظهر منح الدكتوراه في مواقع بوليتو (borse)."),
+    _p("Prof. Alberto Guadagnini", "Full Professor of Hydraulic Engineering; Vice Rector for Research",
+       "Politecnico di Milano", "إيطاليا (Italy)",
+       "https://guadagnini.faculty.polimi.it/",
+       "ينسق مجموعة MIPORE (Porous Media across scales): التدفق والنقل في الأوساط المسامية وعدم اليقين وموارد "
+       "الطاقة الجوفية. حاصل على Henry Darcy Medal وInterPore Medal عام 2024.",
+       "مناسب لمن يريد الجانب الإحصائي وتحليل عدم اليقين. منصبه الإداري قد يحدّ من وقته، فراسل أعضاء المجموعة أيضاً."),
+    _p("Prof. Martin Blunt (مع Dr. Sam Krevor وDr. Ronny Pini)", "Chair in Petroleum Engineering",
+       "Imperial College London", "بريطانيا (UK)",
+       "https://www.imperial.ac.uk/a-z-research/qatar-carbonates-and-carbon-storage/research/labs/msilab/msisummary/",
+       "مختبر Multi-Scale Imaging: آليات التدفق على مقياس المسام في تخزين CO2 والاحتجاز الشعري، وإشراف على أطروحات "
+       "دكتوراه حديثة في هذا المجال.",
+       "من أعلى المجموعات تنافساً عالمياً؛ التمويل غالباً عبر منح DTP/EPSRC أو مشاريع محددة."),
+    _p("Prof. Mehran Sohrabi", "Director, Centre of Enhanced Oil Recovery and CO2 Solutions",
+       "Heriot-Watt University (Institute of GeoEnergy Engineering)", "بريطانيا (UK)",
+       "https://www.eor.hw.ac.uk/mehran-sohrabi/",
+       "EOR وحقن CO2 للاسترداد والتخزين الجيولوجي والنفط الثقيل، مع إشراف مشترك على طلاب دكتوراه.",
+       "مجال مباشر لخلفيتك في إنتاج الآبار والمكامن."),
+    _p("Prof. Martin Fernø", "Professor, Reservoir Physics group", "University of Bergen", "النرويج (Norway)",
+       "https://www.uib.no/en/rg/ptech",
+       "يقود فريقي تخزين الهيدروجين تحت الأرض وتخزين الكربون؛ مشاريع NCS2030 (مركز النرويج لأبحاث CCS) وTime4CO2، "
+       "ومنصة FluidFlower المخبرية.",
+       "الدكتوراه في النرويج وظيفة براتب مرتفع وتُعلَن على Jobbnorge.", email="Martin.Ferno@uib.no"),
+    _p("Prof. Carl Fredrik Berg", "Professor, Geoscience & Petroleum; PoreLab deputy director", "NTNU", "النرويج (Norway)",
+       "https://ntnu.edu/physics/research/porelab",
+       "PoreLab مركز تميز نرويجي (NTNU وOslo): الصخور الرقمية والتدفق على مقياس المسام وتحديد أنواع الصخور بالتعلم الآلي.",
+       "مناسب إن كنت تريد التدفق المسامي والتصوير الرقمي. تُعلن الوظائف على Jobbnorge."),
+    _p("Prof. Merete Vadla Madland", "Professor, Reservoir Technology (Geomechanics)", "University of Stavanger", "النرويج (Norway)",
+       "https://www.uis.no/en/research/national-iorcentre-of-norway",
+       "الجيوميكانيكا وتأثير حقن مياه البحر على طبقات الطباشير؛ مرتبطة بمركز IOR الوطني النرويجي. "
+       "(مصادري قديمة جزئياً: تحقق من نشاطها الحالي.)",
+       "مناسب للجيوميكانيكا وEOR في الكربونات."),
+    _p("Prof. Martin Saar", "Professor, Geothermal Energy & Geofluids (GEG)", "ETH Zurich", "سويسرا (Switzerland)",
+       "https://geg.ethz.ch/",
+       "الحرارة الجوفية وCO2 فوق الحرج والهيدروجين الطبيعي. إعلانات حديثة: دكتوراه في الرنين المغناطيسي للأوساط "
+       "المسامية (مفتوحة حتى الشغور عند آخر مراجعة)، وأخرى في الهيدروجين الميكانيكي-الكيميائي (قد تكون أُغلقت).",
+       "التقديم عبر بوابة ETH الرسمية فقط. السلم المالي في سويسرا مرتفع."),
+    _p("Prof. Leonhard Ganzer (و Dr. Birger Hagemann)", "Reservoir Engineering, Institute of Subsurface Energy Systems",
+       "TU Clausthal", "ألمانيا (Germany)",
+       "https://www.ite.tu-clausthal.de/en/research/subsurface-energy-and-gas-storage",
+       "محاكاة المكامن وتخزين الهيدروجين تحت الأرض وحقن CO2 والحرارة الجوفية؛ مشروع HyUSPRe وسلامة إكمال الآبار في تخزين H2.",
+       "ألمانيا من أوسع أسواق وظائف الدكتوراه الممولة (TV-L)."),
+    _p("Prof. Rainer Helmig", "Multiphase flow in porous media (Stuttgart, status unclear)", "University of Stuttgart", "ألمانيا (Germany)",
+       "https://www.iws.uni-stuttgart.de/institut/team/Helmig",
+       "التدفق متعدد الأطوار في الأوساط المسامية وتخزين CO2 والهيدروجين ومحاكي DuMux. "
+       "(مصادري تتضارب حول وضعه الحالي: أستاذ متقاعد أم بحثي؛ راسل مجموعة LH2/IWS.)",
+       "قيمة علمية عالية في النمذجة؛ تأكد من المجموعة النشطة قبل المراسلة."),
+    _p("Prof. Jesús Carrera", "Research Professor, hydrogeology & reactive transport", "IDAEA-CSIC (Barcelona)", "إسبانيا (Spain)",
+       "https://www.ae-info.org/ae/User/Carrera_Ramirez_Jesus",
+       "النقل التفاعلي والمشكلة العكسية، وعمل مجموعته امتد إلى تخزين CO2 (Hontomín) والصدوع. لم أجد دكتوراه "
+       "محددة في تخزين الهيدروجين، وتُعلَن الوظائف عبر IDAEA وUPC.",
+       "إسبانيا خيار جيد للنقل التفاعلي وتخزين الكربون؛ أرسل بريداً مباشراً.", email="jcrgeo@idaea.csic.es"),
+    _p("Dr. Zoltán Turzó (رئيس القسم في صفحة قديمة)", "Petroleum Engineering, Faculty of Earth & Environmental Sciences and Engineering",
+       "University of Miskolc", "المجر (Hungary)",
+       "https://www.uni-miskolc.hu/en/university/organisations/faculties/faculty-of-earth-and-environmental-sciences-and-engineering/",
+       "القسم الوحيد في المجر لهندسة البترول منذ 1951؛ فرق بحثية في إنتاج النفط والغاز وحفر الآبار العميقة وهجرة "
+       "الهيدروكربونات. (من يرأس القسم الآن غير مؤكد.)",
+       "برنامج الدكتوراه (PhD in Earth Sciences) فيه مسار مدفوع بكلفة معلنة ومسار منحة Stipendium Hungaricum؛ "
+       "راجع الرسوم الفعلية قبل التقديم."),
 ]
