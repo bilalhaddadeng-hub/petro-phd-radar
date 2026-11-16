@@ -59,3 +59,15 @@ def test_normalize_country():
     from scrapers.live_sources import normalize_country
     assert normalize_country("Trondheim, Sør-Trøndelag") == "Norway"
     assert normalize_country("Somewhere unknown") == "دولي"
+
+
+def test_parse_cordis_filters_ended_and_non_doctoral():
+    from scrapers.live_sources import parse_cordis
+    from datetime import date
+    data = {"payload": {"results": [
+        {"id": "1", "acronym": "OLD", "title": "Doctoral network on reservoirs", "teaser": "", "endDate": "31 Dec 2019"},
+        {"id": "2", "acronym": "NEW", "title": "Doctoral network on CO2 storage", "teaser": "", "endDate": "31 Dec 2029"},
+        {"id": "3", "acronym": "NOPHD", "title": "Reservoir sensor", "teaser": "hardware", "endDate": "31 Dec 2029"},
+    ]}}
+    out = parse_cordis(data, today=date(2026, 11, 16))
+    assert [o["link"] for o in out] == ["https://cordis.europa.eu/project/id/2"]

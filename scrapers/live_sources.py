@@ -48,6 +48,12 @@ SEARCH_QUERIES = [
     "hydrogen storage", "geothermal", "geomechanics", "porous media", "enhanced oil recovery",
     "drilling engineering", "subsurface", "oil and gas", "multiphase flow", "petrophysics",
 ]
+# كلمات إضافية للمصادر السريعة (jobs.ac.uk وCORDIS) حيث لا يوجد حد معدل مزعج
+EXTRA_QUERIES = [
+    "carbon storage", "hydrogen", "energy transition", "geoscience PhD", "geology PhD", "earth science PhD",
+    "fluid flow", "numerical modelling subsurface", "rock physics", "digital rock", "reactive transport",
+    "wellbore", "geophysics PhD", "energy geoscience", "decarbonisation PhD", "net zero PhD",
+]
 
 
 class SourceSkipped(Exception):
@@ -187,19 +193,73 @@ def parse_jobsac(html: str) -> List[Dict]:
 
 
 def fetch_jobsac() -> List[Dict]:
-    def one(q):
-        r = _get("https://www.jobs.ac.uk/search/", {"keywords": q, "sortOrder": 1, "pageSize": 50})
+    def one(args):
+        q, start = args
+        r = _get("https://www.jobs.ac.uk/search/",
+                 {"keywords": q, "sortOrder": 1, "pageSize": 25, "startIndex": start})
         return parse_jobsac(r.text) if r else None
 
+    jobs = [(q, st) for q in SEARCH_QUERIES + EXTRA_QUERIES for st in (1, 26, 51, 76, 101)]
     results, failures = [], 0
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as ex:
-        for res in ex.map(one, SEARCH_QUERIES):
+    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as ex:
+        for res in ex.map(one, jobs):
             if res is None:
                 failures += 1
             else:
                 results += res
-    if failures == len(SEARCH_QUERIES):
+    if failures == len(jobs):
         raise RuntimeError("jobs.ac.uk unreachable")
+    return results
+
+
+# ------------------------------ CORDIS (شبكات الدكتوراه الأوروبية MSCA) ------------------------------
+CORDIS_QUERIES = ["reservoir", "CO2 storage", "carbon storage", "hydrogen storage", "geothermal", "porous media",
+                  "subsurface", "geomechanics", "petroleum", "CCUS", "multiphase flow", "oil and gas"]
+
+
+def parse_cordis(data: dict, today: Optional[date] = None) -> List[Dict]:
+    """مشاريع Horizon/MSCA الحالية التي توظف باحثي دكتوراه: تُعلن الوظائف لاحقاً عبر EURAXESS."""
+    today = today or date.today()
+    out = []
+    for h in (data.get("payload") or {}).get("results", []):
+        title, teaser = h.get("title") or "", h.get("teaser") or ""
+        end = re.search(r"(\d{4})\s*$", str(h.get("endDate") or ""))
+        if end and int(end.group(1)) < today.year:
+            continue  # مشروع منتهٍ
+        text = f"{title} {teaser}"
+        if not re.search(r"doctoral|phd|early[- ]stage|marie|msca|training network", text, re.I):
+            continue
+        pid = h.get("id") or h.get("rcn")
+        if not pid:
+            continue
+        acr = h.get("acronym") or ""
+        item = _make(f"Doctoral/PhD project network {acr}: {title}", f"https://cordis.europa.eu/project/id/{pid}",
+                     "Horizon Europe / MSCA (CORDIS)", "Europe", "راجع صفحة المشروع و EURAXESS", text[:300], "CORDIS")
+        item["key_requirements"] = ("🔎 مشروع أوروبي ممول يضم/يوظف باحثي دكتوراه؛ لا يعني وجود مقعد مفتوح الآن. "
+                                    "راجع موقع المشروع وEURAXESS وراسل منسق المشروع.")
+        out.append(item)
+    return out
+
+
+def fetch_cordis() -> List[Dict]:
+    def one(q):
+        try:
+            r = requests.get("https://cordis.europa.eu/api/search/results", headers=HEADERS, timeout=30, params={
+                "q": f"contenttype='project' AND '{q}' AND ('doctoral' OR 'MSCA' OR 'early-stage researchers')",
+                "p": 1, "num": 25, "srt": "/project/contentUpdateDate:decreasing", "format": "json"})
+            return parse_cordis(r.json()) if r.status_code == 200 else None
+        except (requests.RequestException, ValueError):
+            return None
+
+    results, failures = [], 0
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
+        for res in ex.map(one, CORDIS_QUERIES):
+            if res is None:
+                failures += 1
+            else:
+                results += res
+    if failures == len(CORDIS_QUERIES):
+        raise RuntimeError("CORDIS unreachable")
     return results
 
 
@@ -444,6 +504,7 @@ SOURCES: Dict[str, Callable[[], List[Dict]]] = {
     "Arbeitnow": fetch_arbeitnow,
     "jobs.ac.uk": fetch_jobsac,
     "EURAXESS": fetch_euraxess,
+    "CORDIS": fetch_cordis,
 }
 
 
