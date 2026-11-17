@@ -98,3 +98,22 @@ def test_ssrf_guard_and_watch_parse():
 def test_noise_filter_drops_medical_reservoir():
     from scrapers.live_sources import relevance
     assert relevance("PhD position HIV-1 reservoir dynamics")[1] is False
+
+
+def test_parse_feed_google_alert_and_rss():
+    from scrapers.live_sources import parse_feed
+    atom = ('<feed xmlns="http://www.w3.org/2005/Atom"><entry><title>&lt;b&gt;PhD&lt;/b&gt; position reservoir</title>'
+            '<link href="https://www.google.com/url?rct=j&amp;url=https://uni.edu/job1&amp;ct=ga"/>'
+            '<content type="html">funded</content></entry></feed>')
+    out = parse_feed(atom)
+    assert out and out[0]["link"] == "https://uni.edu/job1"
+    rss = '<rss><channel><item><title>PhD CO2 storage</title><link>https://x.org/a</link></item></channel></rss>'
+    assert parse_feed(rss)[0]["link"] == "https://x.org/a"
+
+
+def test_parse_bluesky_post():
+    from scrapers.live_sources import parse_bluesky
+    data = {"posts": [{"uri": "at://did:plc:x/app.bsky.feed.post/abc123", "author": {"handle": "prof.bsky.social"},
+                       "record": {"text": "PhD position in CO2 storage modelling! Apply https://uni.edu/phd"}}]}
+    out = parse_bluesky(data)
+    assert out[0]["link"] == "https://bsky.app/profile/prof.bsky.social/post/abc123"

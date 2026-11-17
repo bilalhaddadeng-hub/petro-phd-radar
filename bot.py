@@ -849,11 +849,11 @@ async def cmd_addsource(update: Update, context: ContextTypes.DEFAULT_TYPE):
     args = context.args or []
     if not args:
         await safe_send(context.bot, update.effective_chat.id,
-                        "الاستخدام: `/addsource الرابط phd` لصفحة برامج دكتوراه، أو `/addsource الرابط jobs` لصفحة وظائف.",
+                        "الاستخدام: `/addsource الرابط phd` لصفحة برامج دكتوراه، أو `/addsource الرابط jobs` لصفحة وظائف، أو `/addsource الرابط rss` لخلاصة RSS (مثل تنبيهات Google Alerts).",
                         parse_mode="Markdown")
         return
     url = args[0].strip()
-    kind = args[1].lower() if len(args) > 1 and args[1].lower() in ("phd", "jobs") else "jobs"
+    kind = args[1].lower() if len(args) > 1 and args[1].lower() in ("phd", "jobs", "rss") else "jobs"
     loop = asyncio.get_running_loop()
     ok = await loop.run_in_executor(None, is_public_http_url, url)
     if not ok:

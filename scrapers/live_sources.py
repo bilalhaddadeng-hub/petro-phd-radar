@@ -45,7 +45,8 @@ EXCLUDE_TERMS = ["senior ", "head of", "professor of", "associate professor", "f
 
 # ضجيج لغوي: "reservoir" في الطب/الحاسوب لا علاقة له بالمكامن
 NOISE_TERMS = ["hiv", "siv ", "reservoir computing", "quantum reservoir", "viral reservoir", "latent reservoir",
-               "zoonotic", "mosquito", "cancer", "tumor", "tumour", "clinical", "neuroscience"]
+               "zoonotic", "mosquito", "cancer", "tumor", "tumour", "clinical", "neuroscience",
+               "tired of", "inquiries", "i am looking for", "i'm looking for", "looking for a phd", "seeking a phd"]
 
 SEARCH_QUERIES = [
     "reservoir engineering", "petroleum engineering", "CCUS", "CO2 storage", "carbon capture storage",
@@ -326,6 +327,93 @@ def fetch_jobrxiv() -> List[Dict]:
     return results
 
 
+# ------------------------------ Bluesky (منشورات الأكاديميين: "PhD position ...") ------------------------------
+BSKY_QUERIES = ["PhD position reservoir", "PhD position CO2 storage", "PhD position geothermal",
+                "PhD position hydrogen storage", "PhD position porous media", "PhD position subsurface",
+                "PhD studentship geoenergy", "doctoral position geomechanics", "PhD position petroleum engineering",
+                "fully funded PhD energy transition geoscience"]
+
+
+def parse_bluesky(data: dict) -> List[Dict]:
+    out = []
+    for post in data.get("posts", []):
+        rec = post.get("record", {}) or {}
+        text = re.sub(r"\s+", " ", rec.get("text", "") or "").strip()
+        handle = (post.get("author", {}) or {}).get("handle", "")
+        rkey = (post.get("uri", "") or "").rsplit("/", 1)[-1]
+        if not text or not handle or not rkey:
+            continue
+        # رابط خارجي داخل المنشور (إعلان فعلي) أفضل من رابط المنشور نفسه
+        ext = re.search(r"https?://\S+", text)
+        link = f"https://bsky.app/profile/{handle}/post/{rkey}"
+        item = _make(text[:150], link, f"@{handle} (Bluesky)", "", None, text, "Bluesky")
+        item["key_requirements"] = ("🔎 منشور من أكاديمي على Bluesky؛ افتح المنشور وراجع الرابط/البريد المذكور فيه."
+                                    + (f" رابط مذكور: {ext.group(0)[:150]}" if ext else ""))
+        out.append(item)
+    return out
+
+
+def fetch_bluesky() -> List[Dict]:
+    def one(q):
+        try:
+            r = requests.get("https://api.bsky.app/xrpc/app.bsky.feed.searchPosts", headers=HEADERS, timeout=25,
+                             params={"q": q, "limit": 25, "sort": "latest"})
+            return parse_bluesky(r.json()) if r.status_code == 200 else None
+        except (requests.RequestException, ValueError):
+            return None
+
+    results, failures = [], 0
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as ex:
+        for res in ex.map(one, BSKY_QUERIES):
+            if res is None:
+                failures += 1
+            else:
+                results += res
+    if failures == len(BSKY_QUERIES):
+        raise RuntimeError("Bluesky unreachable")
+    return results
+
+
+# ------------------------------ RSS/Atom (مثلاً تنبيهات Google Alerts) ------------------------------
+def _clean_google_link(link: str) -> str:
+    """روابط Google Alerts تمر عبر google.com/url?url=...: نستخرج الرابط الحقيقي."""
+    from urllib.parse import parse_qs
+    u = urlparse(link)
+    if u.hostname and u.hostname.endswith("google.com") and u.path == "/url":
+        q = parse_qs(u.query).get("url") or parse_qs(u.query).get("q")
+        if q:
+            return q[0]
+    return link
+
+
+def parse_feed(xml_text: str, source: str = "RSS") -> List[Dict]:
+    import xml.etree.ElementTree as ET
+    try:
+        root = ET.fromstring(xml_text.encode("utf-8", "ignore"))
+    except ET.ParseError:
+        return []
+    out = []
+    for el in root.iter():
+        tag = el.tag.split("}")[-1]
+        if tag not in ("item", "entry"):
+            continue
+        title = link = desc = ""
+        for ch in el:
+            t = ch.tag.split("}")[-1]
+            if t == "title":
+                title = "".join(ch.itertext()).strip()
+            elif t == "link":
+                link = (ch.get("href") or "".join(ch.itertext())).strip()
+            elif t in ("description", "summary", "content"):
+                desc = BeautifulSoup("".join(ch.itertext()), "html.parser").get_text(" ", strip=True)
+        title = BeautifulSoup(title, "html.parser").get_text(" ", strip=True)
+        link = _clean_google_link(link)
+        if title and link.startswith("http"):
+            host = re.sub(r"^www\.", "", urlparse(link).hostname or "")
+            out.append(_make(title, link, host, "", None, f"{title} {desc}"[:500], source))
+    return out
+
+
 # ------------------------------ قائمة المراقبة: صفحات الجامعات (+ ما تضيفه أنت بـ /addsource) ------------------------------
 # kind=phd: صفحة برامج/نداءات دكتوراه (يكفي موضوع الصلة)، kind=jobs: صفحة وظائف (يلزم مستوى + موضوع)
 DEFAULT_WATCHLIST = [
@@ -397,7 +485,11 @@ def fetch_watchlist() -> List[Dict]:
         if not is_public_http_url(url):
             return None
         r = _get_retry(url)
-        return parse_watch_page(r.text, url, kind) if r else None
+        if not r:
+            return None
+        if kind == "rss":
+            return parse_feed(r.text, "RSS")
+        return parse_watch_page(r.text, url, kind)
 
     results, failures = [], 0
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
@@ -710,6 +802,7 @@ SOURCES: Dict[str, Callable[[], List[Dict]]] = {
     "EGUJobs": fetch_egu,
     "jobRxiv": fetch_jobrxiv,
     "Watchlist": fetch_watchlist,
+    "Bluesky": fetch_bluesky,
 }
 
 
