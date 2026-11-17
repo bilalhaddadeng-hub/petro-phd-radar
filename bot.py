@@ -30,7 +30,7 @@ import csv
 import hashlib
 import io
 from telegram import BotCommand
-from telegram.error import BadRequest
+from telegram.error import Conflict, BadRequest
 
 from config import (
     require_token,
@@ -839,7 +839,19 @@ async def log_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"update {kind} chat={c.id if c else None} user=@{(u.username if u else '') or '-'} cmd={cmd}")
 
 async def on_error(update, context: ContextTypes.DEFAULT_TYPE):
-    logger.error("Unhandled error", exc_info=context.error)
+    err = context.error
+    # webhook فُعّل من جهة أخرى بعد تشغيلنا: نسجّل مضيفه (دون المسار/التوكن) ونحذفه فيستأنف الاستقبال
+    if isinstance(err, Conflict) and "webhook is active" in str(err):
+        try:
+            from urllib.parse import urlparse
+            wh = await context.bot.get_webhook_info()
+            logger.warning(f"WEBHOOK_HIJACK host={urlparse(wh.url).hostname} pending={wh.pending_update_count} "
+                           f"ip={wh.ip_address} last_error={wh.last_error_message or '-'}")
+            await context.bot.delete_webhook(drop_pending_updates=False)
+        except Exception as e:
+            logger.warning(f"webhook self-heal failed: {e}")
+        return
+    logger.error("Unhandled error", exc_info=err)
 
 
 @_guard
