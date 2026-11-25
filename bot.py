@@ -897,6 +897,65 @@ async def cmd_delsource(update: Update, context: ContextTypes.DEFAULT_TYPE):
     done = remove_user_source(context.args[0].strip())
     await safe_send(context.bot, update.effective_chat.id, "🗑️ حُذف." if done else "لم أجد هذا الرابط في مصادرك.")
 
+
+def _gap_card(g: dict) -> str:
+    from data.research_gaps import DIFFICULTY_ICON, DATA_LABEL, CROWD_LABEL
+    return (
+        f"🧭 *فجوة {g['id']}: {g['title']}*\n"
+        f"المجال: {g['area']}\n\n"
+        f"*الفجوة المحتملة:* {g['gap']}\n\n"
+        f"*المنهج:* {g['approach']}\n\n"
+        f"{DIFFICULTY_ICON[g['difficulty']]} الصعوبة: {g['difficulty']}/5 | الزمن: {g['months']} شهراً\n"
+        f"📦 البيانات: {DATA_LABEL[g['data']]}\n"
+        f"👥 ازدحام الموضوع: {CROWD_LABEL[g['crowd']]}، {g['crowd_note']}\n"
+        f"🤖 دور Claude: {g['claude']}\n"
+        f"📰 أنواع المجلات: {g['venues']}\n\n"
+        "⚠️ هذه فرضية فجوة من معرفتي، وليست مثبتة. الفحص الآلي أدناه يساعد ولا يغني عن قراءة الأوراق."
+    )
+
+
+@_guard
+async def cmd_gaps(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/gaps : قائمة الفجوات المرشحة. /gaps N : بطاقة الفجوة + فحص تشبّع تلقائي."""
+    from data.research_gaps import RESEARCH_GAPS, AVOID_TOPICS, DIFFICULTY_ICON, CROWD_LABEL, BROAD_QUERY
+    from gapcheck import check_topic, format_check
+    chat_id = update.effective_chat.id
+    if context.args and context.args[0].isdigit():
+        n = int(context.args[0])
+        g = next((x for x in RESEARCH_GAPS if x["id"] == n), None)
+        if not g:
+            await safe_send(context.bot, chat_id, "رقم غير موجود. أرسل /gaps لرؤية القائمة.")
+            return
+        await safe_send(context.bot, chat_id, _gap_card(g), parse_mode="Markdown", disable_web_page_preview=True)
+        loop = asyncio.get_running_loop()
+        res = await loop.run_in_executor(None, check_topic, g["query"], BROAD_QUERY.get(n))
+        await safe_send(context.bot, chat_id, format_check(res), disable_web_page_preview=True)
+        return
+    lines = ["🧭 *فجوات بحثية مرشحة* (فرضيات تحتاج تحققاً، رتّبتها من الأسهل)\n"]
+    for g in sorted(RESEARCH_GAPS, key=lambda x: x["difficulty"]):
+        lines.append(f"{g['id']}. {DIFFICULTY_ICON[g['difficulty']]} {g['title']}\n"
+                     f"   صعوبة {g['difficulty']}/5 | {g['months']} شهراً | ازدحام {CROWD_LABEL[g['crowd']]}")
+    lines.append("\n*تجنّب كمشروع رئيسي بلا بيانات حصرية:*")
+    lines += [f"• {t}" for t in AVOID_TOPICS]
+    lines.append("\nللتفاصيل والفحص: `/gaps 2`  |  لفحص فكرتك: `/gapcheck hydrogen relative permeability hysteresis`")
+    await safe_send(context.bot, chat_id, "\n".join(lines), parse_mode="Markdown", disable_web_page_preview=True)
+
+
+@_guard
+async def cmd_gapcheck(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/gapcheck <عبارة إنجليزية> : فحص تشبّع فكرتك قبل أن تقضي أشهراً عليها."""
+    from gapcheck import check_topic, format_check
+    chat_id = update.effective_chat.id
+    q = " ".join(context.args or []).strip()
+    if len(q) < 6:
+        await safe_send(context.bot, chat_id, "الاستخدام: `/gapcheck عبارة إنجليزية`، مثلاً: `/gapcheck hydrogen relative permeability hysteresis`",
+                        parse_mode="Markdown")
+        return
+    await safe_send(context.bot, chat_id, "⏳ أفحص الأدبيات المنشورة...")
+    loop = asyncio.get_running_loop()
+    res = await loop.run_in_executor(None, check_topic, q, None)
+    await safe_send(context.bot, chat_id, format_check(res), disable_web_page_preview=True)
+
 async def post_init(app):
     # أي webhook قديم يمنع getUpdates (Conflict) فيدخل البوت في حلقة أخطاء
     try:
@@ -919,6 +978,8 @@ async def post_init(app):
         BotCommand("stats", "إحصاءات الرادار"),
         BotCommand("hunt", "صيد فوري"),
         BotCommand("addsource", "أضف موقعاً للمراقبة"),
+        BotCommand("gaps", "فجوات بحثية مرشحة"),
+        BotCommand("gapcheck", "افحص تشبّع فكرة بحثية"),
         BotCommand("sources", "مواقعي المراقَبة"),
         BotCommand("help", "المساعدة"),
     ])
@@ -947,6 +1008,8 @@ def main():
     app.add_handler(CommandHandler("hunt", cmd_hunter_hub))
     app.add_handler(CommandHandler("professors", cmd_professors))
     app.add_handler(CommandHandler("addsource", cmd_addsource))
+    app.add_handler(CommandHandler("gaps", cmd_gaps))
+    app.add_handler(CommandHandler("gapcheck", cmd_gapcheck))
     app.add_handler(CommandHandler("sources", cmd_sources))
     app.add_handler(CommandHandler("delsource", cmd_delsource))
     app.add_handler(CallbackQueryHandler(handle_callbacks))
