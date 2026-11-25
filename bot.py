@@ -80,7 +80,8 @@ from database import (
     count_discovered_gaps,
     take_unnotified_gaps,
     list_recipient_ids,
-    purge_gap_noise
+    purge_gap_noise,
+    get_discovered_gap
 )
 from hunter import execute_deep_hunt, HUNTING_TARGETS
 from data.professors import TOP_PROFESSORS_RADAR
@@ -510,10 +511,20 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data.startswith("gc:"):
         await _send_gap_card(context.bot, query.message.chat_id, int(data.split(":", 1)[1]))
         return
-    if data.startswith("gn:"):
-        text, kb = _newgaps_view(int(data.split(":", 1)[1]))
-        if text:
-            await safe_edit(query, text, parse_mode="Markdown", reply_markup=kb, disable_web_page_preview=True)
+    if data.startswith("gl:"):
+        _, fkey, page_str = data.split(":", 2)
+        text, kb = _newgaps_view(fkey, int(page_str))
+        await safe_edit(query, text, parse_mode="Markdown", reply_markup=kb, disable_web_page_preview=True)
+        return
+    if data.startswith("gd:"):
+        from gapdiscovery import format_discovery
+        d = get_discovered_gap(int(data.split(":", 1)[1]))
+        if d:
+            await safe_send(context.bot, query.message.chat_id, format_discovery(d), disable_web_page_preview=True)
+        return
+    if data.startswith("gn:"):  # أزرار قديمة من النسخة السابقة
+        text, kb = _newgaps_view("a", 1)
+        await safe_edit(query, text, parse_mode="Markdown", reply_markup=kb, disable_web_page_preview=True)
         return
 
     # التنقل بين صفحات الفرص
@@ -1082,20 +1093,72 @@ async def cmd_gaphelp(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown")
 
 
-def _newgaps_view(idx: int):
-    from gapdiscovery import format_discovery
-    total = count_discovered_gaps()
-    if total == 0:
-        return None, None
-    idx = min(max(idx, 0), total - 1)
-    d = list_discovered_gaps(1, idx)[0]
+NEWGAPS_PAGE = 6
+
+
+def _short(text: str, n: int = 150) -> str:
+    text = " ".join((text or "").split())
+    if len(text) <= n:
+        return text
+    return text[:n].rsplit(" ", 1)[0] + "…"
+
+
+def _newgaps_filter(fkey: str):
+    """يحوّل مفتاح الفلتر إلى (topic, since, اسم). a=الكل، w=آخر 14 يوماً، tN=الموضوع رقم N."""
+    from datetime import date, timedelta
+    from gapdiscovery import DISCOVERY_TOPICS
+    if fkey == "w":
+        return None, (date.today() - timedelta(days=14)).isoformat(), "آخر 14 يوماً"
+    if fkey.startswith("t") and fkey[1:].isdigit() and int(fkey[1:]) < len(DISCOVERY_TOPICS):
+        label = DISCOVERY_TOPICS[int(fkey[1:])][0]
+        return label, None, label
+    return None, None, "كل المواضيع"
+
+
+def _newgaps_view(fkey: str = "a", page: int = 1):
+    """قائمة مضغوطة (6 فجوات في الصفحة بسطر موجز لكل واحدة) + أزرار الأرقام والتنقل وفلاتر المواضيع."""
+    from gapdiscovery import DISCOVERY_TOPICS
+    topic, since, name = _newgaps_filter(fkey)
+    total = count_discovered_gaps(topic, since)
+    pages = max(1, (total + NEWGAPS_PAGE - 1) // NEWGAPS_PAGE)
+    page = min(max(page, 1), pages)
+    items = list_discovered_gaps(NEWGAPS_PAGE, (page - 1) * NEWGAPS_PAGE, topic, since) if total else []
+    lines = [f"🆕 *فجوات جديدة معلنة: {name}* ({total}، صفحة {page}/{pages})",
+             "_جمل من ملخصات أوراق حديثة، غير مثبتة. اضغط الرقم للتفاصيل والرابط._\n"]
+    if not items:
+        lines.append("لا نتائج في هذا الفلتر.")
+    for i, d in enumerate(items, (page - 1) * NEWGAPS_PAGE + 1):
+        lines.append(f"*{i}.* [{d['topic']}] {_short(d['sentence'])}\n   📄 {_short(d['title'], 70)} ({d.get('pub_date') or d.get('year')})")
+    rows, row = [], []
+    for i, d in enumerate(items, (page - 1) * NEWGAPS_PAGE + 1):
+        row.append(InlineKeyboardButton(str(i), callback_data=f"gd:{d['id']}"))
+        if len(row) == 3:
+            rows.append(row)
+            row = []
+    if row:
+        rows.append(row)
     nav = []
-    if idx > 0:
-        nav.append(InlineKeyboardButton("◀️ الأحدث", callback_data=f"gn:{idx - 1}"))
-    nav.append(InlineKeyboardButton(f"{idx + 1}/{total}", callback_data="noop"))
-    if idx < total - 1:
-        nav.append(InlineKeyboardButton("الأقدم ▶️", callback_data=f"gn:{idx + 1}"))
-    return format_discovery(d, idx + 1, total), InlineKeyboardMarkup([nav])
+    if page > 1:
+        nav.append(InlineKeyboardButton("⏮", callback_data=f"gl:{fkey}:1"))
+        nav.append(InlineKeyboardButton("◀️", callback_data=f"gl:{fkey}:{page - 1}"))
+    nav.append(InlineKeyboardButton(f"{page}/{pages}", callback_data="noop"))
+    if page < pages:
+        nav.append(InlineKeyboardButton("▶️", callback_data=f"gl:{fkey}:{page + 1}"))
+        nav.append(InlineKeyboardButton("⏭", callback_data=f"gl:{fkey}:{pages}"))
+    rows.append(nav)
+    # فلاتر: كل / آخر 14 يوماً / المواضيع (اسم قصير)
+    rows.append([InlineKeyboardButton("📋 الكل", callback_data="gl:a:1"),
+                 InlineKeyboardButton("🕒 آخر 14 يوماً", callback_data="gl:w:1")])
+    trow = []
+    for idx, (label, *_rest) in enumerate(DISCOVERY_TOPICS):
+        trow.append(InlineKeyboardButton(label.split(" ")[0] + " " + (label.split(" ")[1] if len(label.split(" ")) > 1 else ""),
+                                         callback_data=f"gl:t{idx}:1"))
+        if len(trow) == 2:
+            rows.append(trow)
+            trow = []
+    if trow:
+        rows.append(trow)
+    return "\n".join(lines), InlineKeyboardMarkup(rows)
 
 
 async def _run_discovery(bot_, notify: bool):
@@ -1123,14 +1186,14 @@ async def cmd_newgaps(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     from gapdiscovery import NOISE
     await asyncio.get_running_loop().run_in_executor(None, purge_gap_noise, NOISE)
-    text, kb = _newgaps_view(0)
-    if text is None:
+    if count_discovered_gaps() == 0:
         await safe_send(context.bot, chat_id, "⏳ لا فجوات مخزنة بعد. أجلبها الآن من الأوراق الحديثة (قد يستغرق دقيقة)...")
-        added = await _run_discovery(context.bot, notify=False)
-        text, kb = _newgaps_view(0)
-        if text is None:
-            await safe_send(context.bot, chat_id, "تعذّر الجلب الآن (غالباً حد طلبات OpenAlex). سيعاد المحاولة تلقائياً يومياً.")
+        await _run_discovery(context.bot, notify=False)
+        if count_discovered_gaps() == 0:
+            await safe_send(context.bot, chat_id, "تعذّر الجلب الآن. سيعاد المحاولة تلقائياً يومياً.")
             return
+    arg = (context.args[0].lower() if context.args else "a")
+    text, kb = _newgaps_view(arg if arg in ("a", "w") or arg.startswith("t") else "a", 1)
     await safe_send(context.bot, chat_id, text, parse_mode="Markdown", reply_markup=kb, disable_web_page_preview=True)
 
 

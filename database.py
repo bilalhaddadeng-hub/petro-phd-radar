@@ -669,22 +669,45 @@ def add_discovered_gaps(items: List[Dict]) -> int:
     return added
 
 
-def list_discovered_gaps(limit: int = 1, offset: int = 0) -> List[Dict]:
+def _gap_where(topic=None, since=None):
+    cond, args = [], []
+    if topic:
+        cond.append("topic = ?")
+        args.append(topic)
+    if since:
+        cond.append("pub_date >= ?")
+        args.append(since)
+    return (" WHERE " + " AND ".join(cond)) if cond else "", args
+
+
+def list_discovered_gaps(limit: int = 1, offset: int = 0, topic=None, since=None) -> List[Dict]:
     init_gap_tables()
+    where, args = _gap_where(topic, since)
     conn = get_connection()
     try:
-        rows = conn.execute("SELECT * FROM discovered_gaps ORDER BY pub_date DESC, found_at DESC LIMIT ? OFFSET ?",
-                            (limit, offset)).fetchall()
+        rows = conn.execute(f"SELECT rowid AS id, * FROM discovered_gaps{where} "
+                            "ORDER BY pub_date DESC, found_at DESC LIMIT ? OFFSET ?", (*args, limit, offset)).fetchall()
         return [dict(r) for r in rows]
     finally:
         conn.close()
 
 
-def count_discovered_gaps() -> int:
+def count_discovered_gaps(topic=None, since=None) -> int:
+    init_gap_tables()
+    where, args = _gap_where(topic, since)
+    conn = get_connection()
+    try:
+        return conn.execute(f"SELECT COUNT(*) FROM discovered_gaps{where}", args).fetchone()[0]
+    finally:
+        conn.close()
+
+
+def get_discovered_gap(gap_id: int) -> Optional[Dict]:
     init_gap_tables()
     conn = get_connection()
     try:
-        return conn.execute("SELECT COUNT(*) FROM discovered_gaps").fetchone()[0]
+        r = conn.execute("SELECT rowid AS id, * FROM discovered_gaps WHERE rowid = ?", (gap_id,)).fetchone()
+        return dict(r) if r else None
     finally:
         conn.close()
 
