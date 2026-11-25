@@ -898,8 +898,12 @@ async def cmd_delsource(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await safe_send(context.bot, update.effective_chat.id, "🗑️ حُذف." if done else "لم أجد هذا الرابط في مصادرك.")
 
 
-def _gap_card(g: dict) -> str:
+def _gap_card(g: dict, score=None, n_recent=None) -> str:
     from data.research_gaps import DIFFICULTY_ICON, DATA_LABEL, CROWD_LABEL
+    live = ""
+    if n_recent is not None:
+        live = f"\n📊 أوراق مطابقة منذ 3 سنوات (فحص حي): {n_recent}"
+    sc = f"\n🎯 درجة الأولوية: {score}/11" if score is not None else ""
     return (
         f"🧭 *فجوة {g['id']}: {g['title']}*\n"
         f"المجال: {g['area']}\n\n"
@@ -907,38 +911,90 @@ def _gap_card(g: dict) -> str:
         f"*المنهج:* {g['approach']}\n\n"
         f"{DIFFICULTY_ICON[g['difficulty']]} الصعوبة: {g['difficulty']}/5 | الزمن: {g['months']} شهراً\n"
         f"📦 البيانات: {DATA_LABEL[g['data']]}\n"
-        f"👥 ازدحام الموضوع: {CROWD_LABEL[g['crowd']]}، {g['crowd_note']}\n"
+        f"👥 ازدحام (تقدير أولي): {CROWD_LABEL[g['crowd']]}، {g['crowd_note']}\n"
         f"🤖 دور Claude: {g['claude']}\n"
-        f"📰 أنواع المجلات: {g['venues']}\n\n"
+        f"📰 أنواع المجلات: {g['venues']}"
+        f"{live}{sc}\n\n"
         "⚠️ هذه فرضية فجوة من معرفتي، وليست مثبتة. الفحص الآلي أدناه يساعد ولا يغني عن قراءة الأوراق."
     )
 
 
+GAPS_PAGE = 8
+
+
 @_guard
 async def cmd_gaps(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/gaps : قائمة الفجوات المرشحة. /gaps N : بطاقة الفجوة + فحص تشبّع تلقائي."""
+    """/gaps [صفحة|easy|nodata|italy] : القائمة. /gaps N : بطاقة + فحص حي. /gaprank : ترتيب حي بالأرقام."""
     from data.research_gaps import RESEARCH_GAPS, AVOID_TOPICS, DIFFICULTY_ICON, CROWD_LABEL, BROAD_QUERY
-    from gapcheck import check_topic, format_check
+    from gapcheck import check_topic, format_check, priority, count_recent
     chat_id = update.effective_chat.id
-    if context.args and context.args[0].isdigit():
-        n = int(context.args[0])
-        g = next((x for x in RESEARCH_GAPS if x["id"] == n), None)
-        if not g:
-            await safe_send(context.bot, chat_id, "رقم غير موجود. أرسل /gaps لرؤية القائمة.")
-            return
-        await safe_send(context.bot, chat_id, _gap_card(g), parse_mode="Markdown", disable_web_page_preview=True)
-        loop = asyncio.get_running_loop()
-        res = await loop.run_in_executor(None, check_topic, g["query"], BROAD_QUERY.get(n))
+    arg = (context.args[0].lower() if context.args else "")
+    loop = asyncio.get_running_loop()
+    if arg.isdigit() and any(g["id"] == int(arg) for g in RESEARCH_GAPS):
+        g = next(x for x in RESEARCH_GAPS if x["id"] == int(arg))
+        n = await loop.run_in_executor(None, count_recent, g["query"])
+        await safe_send(context.bot, chat_id, _gap_card(g, priority(g, n), n), parse_mode="Markdown",
+                        disable_web_page_preview=True)
+        res = await loop.run_in_executor(None, check_topic, g["query"], BROAD_QUERY.get(g["id"]))
         await safe_send(context.bot, chat_id, format_check(res), disable_web_page_preview=True)
         return
-    lines = ["🧭 *فجوات بحثية مرشحة* (فرضيات تحتاج تحققاً، رتّبتها من الأسهل)\n"]
-    for g in sorted(RESEARCH_GAPS, key=lambda x: x["difficulty"]):
-        lines.append(f"{g['id']}. {DIFFICULTY_ICON[g['difficulty']]} {g['title']}\n"
-                     f"   صعوبة {g['difficulty']}/5 | {g['months']} شهراً | ازدحام {CROWD_LABEL[g['crowd']]}")
-    lines.append("\n*تجنّب كمشروع رئيسي بلا بيانات حصرية:*")
-    lines += [f"• {t}" for t in AVOID_TOPICS]
-    lines.append("\nللتفاصيل والفحص: `/gaps 2`  |  لفحص فكرتك: `/gapcheck hydrogen relative permeability hysteresis`")
+    items = sorted(RESEARCH_GAPS, key=lambda x: -priority(x))
+    title = "كل الفجوات مرتبة بدرجة الأولوية الأولية"
+    if arg == "easy":
+        items = [g for g in items if g["difficulty"] <= 2 and g["data"] in ("none", "public")]
+        title = "الأسهل (صعوبة ≤2 بلا مختبر)"
+    elif arg == "nodata":
+        items = [g for g in items if g["data"] == "none"]
+        title = "بلا أي بيانات حقلية"
+    elif arg == "italy":
+        items = [g for g in items if "إيطالي" in g["title"] or "متوسط" in g["title"] or "صقلية" in g["title"]]
+        title = "ذات صلة بإيطاليا/المتوسط"
+    page = int(arg[1:]) if (arg.startswith("p") and arg[1:].isdigit()) else 1
+    pages = max(1, (len(items) + GAPS_PAGE - 1) // GAPS_PAGE)
+    page = min(max(page, 1), pages)
+    chunk = items[(page - 1) * GAPS_PAGE: page * GAPS_PAGE]
+    lines = [f"🧭 *{title}* ({len(items)} فجوة، صفحة {page}/{pages})\n_فرضيات تحتاج تحققاً، والدرجة للترتيب فقط_\n"]
+    for g in chunk:
+        lines.append(f"*{g['id']}.* {DIFFICULTY_ICON[g['difficulty']]} {g['title']}\n"
+                     f"   أولوية {priority(g)} | صعوبة {g['difficulty']}/5 | {g['months']} شهراً | ازدحام {CROWD_LABEL[g['crowd']]}")
+    if page == pages:
+        lines.append("\n*تجنّب كمشروع رئيسي بلا بيانات حصرية:*")
+        lines += [f"• {t}" for t in AVOID_TOPICS]
+    lines.append("\nللتفاصيل والفحص الحي: `/gaps 5` (رقم الفجوة) | الصفحات: `/gaps p2`")
+    lines.append("فلاتر: `/gaps easy` `/gaps nodata` `/gaps italy` | ترتيب حي بالأرقام: `/gaprank` | "
+                 "فحص فكرتك: `/gapcheck ...` | خريطة الفراغات: `/gapmatrix`")
     await safe_send(context.bot, chat_id, "\n".join(lines), parse_mode="Markdown", disable_web_page_preview=True)
+
+
+@_guard
+async def cmd_gaprank(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """ترتيب حي لكل الفجوات بالعدد الفعلي للأوراق المطابقة (OpenAlex)."""
+    from data.research_gaps import RESEARCH_GAPS
+    from gapcheck import rank_gaps
+    chat_id = update.effective_chat.id
+    await safe_send(context.bot, chat_id, "⏳ أقيس الأدبيات لكل فجوة (قد يستغرق دقيقة)...")
+    loop = asyncio.get_running_loop()
+    ranked = await loop.run_in_executor(None, rank_gaps, RESEARCH_GAPS, True)
+    lines = ["🏁 *ترتيب حي للفجوات* (سهولة + بيانات + ازدحام فعلي + ملاءمتك؛ الحد الأقصى ≈ 11)\n"]
+    for g in ranked[:15]:
+        n = "؟" if g["n_recent"] is None else g["n_recent"]
+        lines.append(f"*{g['id']}.* {g['score']} | أوراق مطابقة: {n} | {g['title'][:60]}")
+    lines.append("\n⚠️ استعلامات ضيقة قد تعطي أعداداً صغيرة لأن الصياغة تختلف؛ العدد الصغير لا يثبت الفجوة. "
+                 "افتح `/gaps N` وقرأ الأوراق القريبة قبل أي التزام. `؟` = تعذر القياس.")
+    await safe_send(context.bot, chat_id, "\n".join(lines), parse_mode="Markdown", disable_web_page_preview=True)
+
+
+@_guard
+async def cmd_gapmatrix(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """خريطة فراغات: تقاطع الطرق الحديثة مع تطبيقات التخزين الجوفي."""
+    from data.research_gaps import MATRIX_METHODS, MATRIX_APPS
+    from gapcheck import build_matrix, format_matrix
+    chat_id = update.effective_chat.id
+    await safe_send(context.bot, chat_id, "⏳ أبني الخريطة (35 استعلاماً)...")
+    loop = asyncio.get_running_loop()
+    grid = await loop.run_in_executor(None, build_matrix, MATRIX_METHODS, MATRIX_APPS)
+    await safe_send(context.bot, chat_id, format_matrix(MATRIX_METHODS, MATRIX_APPS, grid),
+                    parse_mode="Markdown", disable_web_page_preview=True)
 
 
 @_guard
@@ -980,6 +1036,8 @@ async def post_init(app):
         BotCommand("addsource", "أضف موقعاً للمراقبة"),
         BotCommand("gaps", "فجوات بحثية مرشحة"),
         BotCommand("gapcheck", "افحص تشبّع فكرة بحثية"),
+        BotCommand("gaprank", "ترتيب الفجوات بالأرقام"),
+        BotCommand("gapmatrix", "خريطة فراغات الطرق×التطبيقات"),
         BotCommand("sources", "مواقعي المراقَبة"),
         BotCommand("help", "المساعدة"),
     ])
@@ -1010,6 +1068,8 @@ def main():
     app.add_handler(CommandHandler("addsource", cmd_addsource))
     app.add_handler(CommandHandler("gaps", cmd_gaps))
     app.add_handler(CommandHandler("gapcheck", cmd_gapcheck))
+    app.add_handler(CommandHandler("gaprank", cmd_gaprank))
+    app.add_handler(CommandHandler("gapmatrix", cmd_gapmatrix))
     app.add_handler(CommandHandler("sources", cmd_sources))
     app.add_handler(CommandHandler("delsource", cmd_delsource))
     app.add_handler(CallbackQueryHandler(handle_callbacks))
