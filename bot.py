@@ -103,7 +103,8 @@ MAIN_KEYBOARD = [
     [KeyboardButton("🟢 وجهات سهلة القبول وعالية الفرص"), KeyboardButton("🏢 دكتوراه صناعية (شركات)")],
     [KeyboardButton("💼 فرص تدريب وأطروحة R&D"), KeyboardButton("👨‍🏫 رادار الأساتذة والمشاريع")],
     [KeyboardButton("🎯 صياد الفرص الحي (Live Hunter)"), KeyboardButton("⭐ الفرص المحفوظة (المفضلة)")],
-    [KeyboardButton("🌍 تصفح حسب الدولة"), KeyboardButton("🔍 بحث مخصص في الفرص")]
+    [KeyboardButton("🌍 تصفح حسب الدولة"), KeyboardButton("🔍 بحث مخصص في الفرص")],
+    [KeyboardButton("🧭 فجوات بحثية للنشر (Q1/Q2)"), KeyboardButton("🧪 فحص فكرة بحثية")]
 ]
 REPLY_MARKUP = ReplyKeyboardMarkup(MAIN_KEYBOARD, resize_keyboard=True)
 
@@ -273,9 +274,11 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 • مكامن وتخزين جوفي (CCUS/H2): *{len(res_opps)} فرصة*
 • بوابات الرصد المستمر: *{len(HUNTING_TARGETS)} بوابة دولية (تشمل الجامعات + كبرى ومتوسطات الشركات وبيوت الخبرة الاستشارية)*
 • متطلب الخبرة: *0 سنوات (مفتوحة لحديثي التخرج من الماستر)*
-• حالة الروابط: *100% مباشرة ومفحوصة (Zero Dead Links)*
+• الروابط: *تُفحص تلقائياً، وقد يتعطل بعضها أحياناً فتحقق قبل التقديم*
 • السيرفر السحابي: *يعمل 24/7 دون توقف*
 • الحساب: *مصرح ومحمي حصرياً لك*
+
+🧭 *جديد: الفجوات البحثية للنشر.* زر «فجوات بحثية للنشر» أو الأمر /gaps (31 فجوة بتصنيف Q1/Q2 وصعوبة القبول)، و/gapcheck لفحص فكرتك، و/gaprank و/gapmatrix.
 
 👇 *استخدم الأزرار التفاعلية بالأسفل للتصفح السلس بنقرة واحدة:*
 """
@@ -454,6 +457,14 @@ async def handle_user_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await cmd_hunter_hub(update, context)
     elif text == "🔍 بحث مخصص في الفرص":
         await cmd_search_prompt(update, context)
+    elif text == "🧭 فجوات بحثية للنشر (Q1/Q2)":
+        await cmd_gaps(update, context)
+    elif text == "🧪 فحص فكرة بحثية":
+        await update.message.reply_text(
+            "🧪 لفحص فكرتك قبل أن تقضي عليها أشهراً، أرسل:\n`/gapcheck عبارة إنجليزية`\n"
+            "مثال: `/gapcheck hydrogen relative permeability hysteresis`\n\n"
+            "أو افتح الفجوات الجاهزة: `/gaps` ثم `/gaps 25` لرقم فجوة.",
+            parse_mode="Markdown")
     else:
         # اعتبار النص ككلمة بحث
         category = f"search:{text}"
