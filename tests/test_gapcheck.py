@@ -58,4 +58,4 @@ def test_every_gap_has_tier_and_live_downgrade():
     g = next(x for x in RESEARCH_GAPS if x["id"] == 1)
     base, crowded = tier_info(g), tier_info(g, 500)
     assert crowded["risk"] == base["risk"] + 1 and crowded["verdict"] != "go" and crowded["notes"]
-    assert "Scimago" in tier_block(g)
+    assert "المستوى الواقعي" in tier_block(g) and "صعوبة القبول" in tier_block(g)

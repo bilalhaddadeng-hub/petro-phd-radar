@@ -126,14 +126,21 @@ def tier_line(g: Dict, n_recent: Optional[int] = None) -> str:
     return f"{t['verdict_label']} | واقعي {t['likely']} (الأعلى {t['best']}) | قبول {t['risk']}/5"
 
 
+VERDICT_MEANING = {
+    "go": "تستحق البدء إن توفرت لك الشروط الأساسية",
+    "cond": "تستحق، لكن بشروط محددة (انظر «تضعف إذا» أدناه)",
+    "weak": "لا أنصح بها الآن كمشروع رئيسي",
+}
+RISK_MEANING = {1: "سهل القبول", 2: "قبول معقول", 3: "قبول متوسط الصعوبة", 4: "قبول صعب", 5: "شبه مستحيل دون عناصر استثنائية"}
+
+
 def tier_block(g: Dict, n_recent: Optional[int] = None) -> str:
     t = tier_info(g, n_recent)
-    lines = ["🏷️ *التصنيف المنطقي:*",
+    lines = ["🏷️ *تقييم النشر:*",
+             f"• الحكم: {t['verdict_label']} ({VERDICT_MEANING[t['verdict']]})",
              f"• نوع المساهمة: {t['kind_label']}",
-             f"• المستوى الأعلى إن نُفِّذ بامتياز: {t['best']} | الأرجح عند تنفيذ جيد: {t['likely']}",
-             f"• صعوبة القبول: {t['risk']}/5",
-             f"• الحكم: {t['verdict_label']}",
-             f"• تكون ضعيفة إذا: {t['weak_if']}"]
-    lines += [f"• ملاحظة: {n}" for n in t["notes"]]
-    lines.append("(الربع الدقيق يخص المجلة في Scimago، تحقق منه للمجلة التي تختارها.)")
+             f"• المستوى الواقعي: {t['likely']} " + ("(وهو سقفها الواقعي أيضاً)" if t['likely'] == t['best'] else f"(الأعلى {t['best']} إن نُفِّذت بامتياز)"),
+             f"• صعوبة القبول: {t['risk']}/5 ({RISK_MEANING[t['risk']]})",
+             f"• تضعف الفجوة إذا: {t['weak_if']}"]
+    lines += [f"• تعديل حي: {n}" for n in t["notes"]]
     return "\n".join(lines)

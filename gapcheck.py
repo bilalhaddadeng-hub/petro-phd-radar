@@ -54,7 +54,7 @@ def _get(params: Dict) -> Optional[Dict]:
 
 def clean_query(q: str) -> str:
     """يمنع رموز الفلترة من كسر الاستعلام (الفاصلة والنقطتان تعنيان فلتراً جديداً في OpenAlex)."""
-    return " ".join(q.replace(",", " ").replace(":", " ").replace("|", " ").split())[:400]
+    return " ".join(q.replace(",", " ").replace(":", " ").replace("|", " ").split())[:800]
 
 
 def parse_year_groups(data: Optional[Dict]) -> Dict[int, int]:

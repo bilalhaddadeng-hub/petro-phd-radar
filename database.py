@@ -635,3 +635,80 @@ def get_favorite_reminders(days_set) -> List[Tuple[str, Dict]]:
             o = dict(r); o["days_left"] = d
             out.append((r["chat_id"], o))
     return out
+
+
+# ------------------------------ فجوات مكتشفة تلقائياً ------------------------------
+def init_gap_tables():
+    conn = get_connection()
+    try:
+        conn.execute("""CREATE TABLE IF NOT EXISTS discovered_gaps (
+            key TEXT PRIMARY KEY, topic TEXT, sentence TEXT, title TEXT, year INTEGER, pub_date TEXT,
+            venue TEXT, url TEXT, cites INTEGER DEFAULT 0, found_at TEXT, notified INTEGER DEFAULT 0)""")
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def add_discovered_gaps(items: List[Dict]) -> int:
+    """يضيف الجديد فقط (المفتاح DOI/معرّف). يعيد عدد المضاف فعلاً."""
+    init_gap_tables()
+    conn = get_connection()
+    added = 0
+    try:
+        now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        for d in items:
+            cur = conn.execute(
+                "INSERT OR IGNORE INTO discovered_gaps (key, topic, sentence, title, year, pub_date, venue, url, cites, found_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (d["key"], d["topic"], d["sentence"], d["title"], d.get("year"), d.get("date", ""),
+                 d.get("venue", ""), d.get("url", ""), d.get("cites", 0), now_str))
+            added += cur.rowcount
+        conn.commit()
+    finally:
+        conn.close()
+    return added
+
+
+def list_discovered_gaps(limit: int = 1, offset: int = 0) -> List[Dict]:
+    init_gap_tables()
+    conn = get_connection()
+    try:
+        rows = conn.execute("SELECT * FROM discovered_gaps ORDER BY pub_date DESC, found_at DESC LIMIT ? OFFSET ?",
+                            (limit, offset)).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def count_discovered_gaps() -> int:
+    init_gap_tables()
+    conn = get_connection()
+    try:
+        return conn.execute("SELECT COUNT(*) FROM discovered_gaps").fetchone()[0]
+    finally:
+        conn.close()
+
+
+def take_unnotified_gaps(limit: int = 3) -> List[Dict]:
+    """أحدث الفجوات التي لم تُرسَل بعد، ويعلّمها كمُرسَلة."""
+    init_gap_tables()
+    conn = get_connection()
+    try:
+        rows = conn.execute("SELECT * FROM discovered_gaps WHERE notified = 0 ORDER BY pub_date DESC LIMIT ?",
+                            (limit,)).fetchall()
+        items = [dict(r) for r in rows]
+        # ما زاد على الحد يُعلَّم أيضاً كي لا يتراكم ويُغرق المستخدم لاحقاً
+        conn.execute("UPDATE discovered_gaps SET notified = 1 WHERE notified = 0")
+        conn.commit()
+        return items
+    finally:
+        conn.close()
+
+
+def list_recipient_ids() -> List[str]:
+    conn = get_connection()
+    try:
+        ids = {r[0] for r in conn.execute("SELECT chat_id FROM authorized_users").fetchall()}
+    finally:
+        conn.close()
+    return sorted(ids | {str(x) for x in OWNER_CHAT_IDS})

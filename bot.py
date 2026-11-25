@@ -74,7 +74,12 @@ from database import (
     get_latest_portal_audits,
     add_user_source,
     remove_user_source,
-    list_user_sources
+    list_user_sources,
+    add_discovered_gaps,
+    list_discovered_gaps,
+    count_discovered_gaps,
+    take_unnotified_gaps,
+    list_recipient_ids
 )
 from hunter import execute_deep_hunt, HUNTING_TARGETS
 from data.professors import TOP_PROFESSORS_RADAR
@@ -104,7 +109,8 @@ MAIN_KEYBOARD = [
     [KeyboardButton("💼 فرص تدريب وأطروحة R&D"), KeyboardButton("👨‍🏫 رادار الأساتذة والمشاريع")],
     [KeyboardButton("🎯 صياد الفرص الحي (Live Hunter)"), KeyboardButton("⭐ الفرص المحفوظة (المفضلة)")],
     [KeyboardButton("🌍 تصفح حسب الدولة"), KeyboardButton("🔍 بحث مخصص في الفرص")],
-    [KeyboardButton("🧭 فجوات بحثية للنشر (Q1/Q2)"), KeyboardButton("🧪 فحص فكرة بحثية")]
+    [KeyboardButton("🧭 فجوات بحثية للنشر (Q1/Q2)"), KeyboardButton("🆕 فجوات جديدة (تتجدد يومياً)")],
+    [KeyboardButton("🧪 فحص فكرة بحثية")]
 ]
 REPLY_MARKUP = ReplyKeyboardMarkup(MAIN_KEYBOARD, resize_keyboard=True)
 
@@ -278,7 +284,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 • السيرفر السحابي: *يعمل 24/7 دون توقف*
 • الحساب: *مصرح ومحمي حصرياً لك*
 
-🧭 *جديد: الفجوات البحثية للنشر.* زر «فجوات بحثية للنشر» أو الأمر /gaps (31 فجوة بتصنيف Q1/Q2 وصعوبة القبول)، و/gapcheck لفحص فكرتك، و/gaprank و/gapmatrix.
+🧭 *جديد: الفجوات البحثية للنشر.* زر «فجوات بحثية للنشر» أو الأمر /gaps (31 فجوة بتصنيف Q1/Q2 وصعوبة القبول)، و/newgaps لفجوات جديدة تتجدد يومياً من الأوراق الحديثة، و/gapcheck لفحص فكرتك، و/gaphelp لشرح المصطلحات.
 
 👇 *استخدم الأزرار التفاعلية بالأسفل للتصفح السلس بنقرة واحدة:*
 """
@@ -459,6 +465,8 @@ async def handle_user_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await cmd_search_prompt(update, context)
     elif text == "🧭 فجوات بحثية للنشر (Q1/Q2)":
         await cmd_gaps(update, context)
+    elif text == "🆕 فجوات جديدة (تتجدد يومياً)":
+        await cmd_newgaps(update, context)
     elif text == "🧪 فحص فكرة بحثية":
         await update.message.reply_text(
             "🧪 لفحص فكرتك قبل أن تقضي عليها أشهراً، أرسل:\n`/gapcheck عبارة إنجليزية`\n"
@@ -490,6 +498,21 @@ async def handle_callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not is_user_authorized(chat_id, username):
         await query.answer("🔒 الرادار مقفل - يرجى الدخول عبر رابط الدعوة الحصري", show_alert=True)
+        return
+
+    # فجوات بحثية: تنقل/بطاقة/جديدة
+    if data.startswith("gp:"):
+        _, key, page_str = data.split(":", 2)
+        text, kb = _gaps_view(key if key in GAP_FILTERS else "all", int(page_str))
+        await safe_edit(query, text, parse_mode="Markdown", reply_markup=kb, disable_web_page_preview=True)
+        return
+    if data.startswith("gc:"):
+        await _send_gap_card(context.bot, query.message.chat_id, int(data.split(":", 1)[1]))
+        return
+    if data.startswith("gn:"):
+        text, kb = _newgaps_view(int(data.split(":", 1)[1]))
+        if text:
+            await safe_edit(query, text, parse_mode="Markdown", reply_markup=kb, disable_web_page_preview=True)
         return
 
     # التنقل بين صفحات الفرص
@@ -910,81 +933,208 @@ async def cmd_delsource(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await safe_send(context.bot, update.effective_chat.id, "🗑️ حُذف." if done else "لم أجد هذا الرابط في مصادرك.")
 
 
+CROWD_MEANING = {
+    "low": "قليل من يعمل عليه؛ فرصة، لكن تأكد أن السبب ليس قلة الاهتمام العلمي",
+    "medium": "منافسة معتدلة؛ تحتاج زاوية محددة لتتميز",
+    "high": "منافسة شديدة؛ لا تبدأ إلا بميزة واضحة (بيانات حصرية أو طريقة جديدة فعلاً)",
+}
+DIFF_MEANING = {1: "سهلة جداً", 2: "سهلة", 3: "متوسطة", 4: "صعبة", 5: "صعبة جداً"}
+
+
 def _gap_card(g: dict, score=None, n_recent=None) -> str:
-    from data.research_gaps import DIFFICULTY_ICON, DATA_LABEL, CROWD_LABEL
-    live = ""
+    from data.research_gaps import DATA_LABEL, CROWD_LABEL
+    crowd_live = ""
     if n_recent is not None:
-        live = f"\n📊 أوراق مطابقة منذ 3 سنوات (فحص حي): {n_recent}"
-    sc = f"\n🎯 درجة الأولوية: {score}/11" if score is not None else ""
+        crowd_live = f"\n   قياس فعلي: {n_recent} ورقة مطابقة منذ 3 سنوات (OpenAlex)"
+    sc = f"\n🎯 درجة الأولوية: {score}/11 (للترتيب فقط)" if score is not None else ""
     return (
         f"🧭 *فجوة {g['id']}: {g['title']}*\n"
         f"المجال: {g['area']}\n\n"
-        f"*الفجوة المحتملة:* {g['gap']}\n\n"
-        f"*المنهج:* {g['approach']}\n\n"
-        f"{DIFFICULTY_ICON[g['difficulty']]} الصعوبة: {g['difficulty']}/5 | الزمن: {g['months']} شهراً\n"
-        f"📦 البيانات: {DATA_LABEL[g['data']]}\n"
-        f"👥 ازدحام (تقدير أولي): {CROWD_LABEL[g['crowd']]}، {g['crowd_note']}\n"
-        f"🤖 دور Claude: {g['claude']}\n"
-        f"📰 أنواع المجلات: {g['venues']}"
-        f"{live}{sc}\n\n"
+        f"*ما الفجوة؟* {g['gap']}\n\n"
+        f"*كيف تُسَدّ؟* {g['approach']}\n\n"
+        "📋 *الخصائص:*\n"
+        f"• الصعوبة التقنية: {g['difficulty']}/5 ({DIFF_MEANING[g['difficulty']]}) | الزمن التقريبي: {g['months']} شهراً\n"
+        f"• البيانات: {DATA_LABEL[g['data']]}\n"
+        f"• الازدحام: {CROWD_LABEL[g['crowd']]}، أي {CROWD_MEANING[g['crowd']]}"
+        f"{crowd_live}\n"
+        f"   سبب التقدير: {g['crowd_note']}\n"
+        f"• دور Claude: {g['claude']}\n"
+        f"• مجلات مناسبة: {g['venues']}"
+        f"{sc}\n\n"
         f"{tier_block(g, n_recent)}\n\n"
-        "⚠️ هذه فرضية فجوة من معرفتي، وليست مثبتة. الفحص الآلي أدناه يساعد ولا يغني عن قراءة الأوراق."
+        "⚠️ فرضية فجوة من معرفتي، وليست مثبتة. اقرأ الأوراق القريبة أدناه قبل أي التزام. معاني المصطلحات: /gaphelp"
     )
 
 
 GAPS_PAGE = 8
+GAP_FILTERS = {
+    "all": "كل الفجوات مرتبة بدرجة الأولوية الأولية",
+    "easy": "الأسهل (صعوبة ≤2 بلا مختبر)",
+    "nodata": "بلا أي بيانات حقلية",
+    "italy": "ذات صلة بإيطاليا/المتوسط",
+    "q1": "قادرة على Q1 إن نُفِّذت بامتياز (بلا الضعيفة)",
+    "weak": "الضعيفة/لا أنصح بها الآن",
+}
+
+
+def _filter_gaps(key: str):
+    from data.research_gaps import RESEARCH_GAPS
+    from gapcheck import priority
+    from data.gap_tiers import tier_info
+    items = sorted(RESEARCH_GAPS, key=lambda x: -priority(x))
+    if key == "easy":
+        items = [g for g in items if g["difficulty"] <= 2 and g["data"] in ("none", "public")]
+    elif key == "nodata":
+        items = [g for g in items if g["data"] == "none"]
+    elif key == "italy":
+        items = [g for g in items if "إيطالي" in g["title"] or "متوسط" in g["title"] or "صقلية" in g["title"]]
+    elif key == "q1":
+        items = [g for g in items if tier_info(g)["best"] == "Q1" and tier_info(g)["verdict"] != "weak"]
+    elif key == "weak":
+        items = [g for g in items if tier_info(g)["verdict"] == "weak"]
+    return items
+
+
+def _gaps_view(key: str, page: int):
+    """نص القائمة ولوحة أزرارها (أرقام الفجوات + التنقل + الفلاتر)."""
+    from data.research_gaps import AVOID_TOPICS, DIFFICULTY_ICON
+    from gapcheck import priority
+    items = _filter_gaps(key)
+    pages = max(1, (len(items) + GAPS_PAGE - 1) // GAPS_PAGE)
+    page = min(max(page, 1), pages)
+    chunk = items[(page - 1) * GAPS_PAGE: page * GAPS_PAGE]
+    lines = [f"🧭 *{GAP_FILTERS[key]}* ({len(items)} فجوة، صفحة {page}/{pages})\n"
+             "_فرضيات تحتاج تحققاً. اضغط رقم الفجوة للتفاصيل والفحص الحي._\n"]
+    for g in chunk:
+        lines.append(f"*{g['id']}.* {DIFFICULTY_ICON[g['difficulty']]} {g['title']}\n"
+                     f"   {tier_line(g)}\n"
+                     f"   أولوية {priority(g)} | صعوبة {g['difficulty']}/5 | {g['months']} شهراً")
+    if page == pages:
+        lines.append("\n*تجنّب كمشروع رئيسي بلا بيانات حصرية:*")
+        lines += [f"• {t}" for t in AVOID_TOPICS]
+    rows, row = [], []
+    for g in chunk:
+        row.append(InlineKeyboardButton(str(g["id"]), callback_data=f"gc:{g['id']}"))
+        if len(row) == 4:
+            rows.append(row)
+            row = []
+    if row:
+        rows.append(row)
+    nav = []
+    if page > 1:
+        nav.append(InlineKeyboardButton("◀️ السابق", callback_data=f"gp:{key}:{page - 1}"))
+    nav.append(InlineKeyboardButton(f"{page}/{pages}", callback_data="noop"))
+    if page < pages:
+        nav.append(InlineKeyboardButton("التالي ▶️", callback_data=f"gp:{key}:{page + 1}"))
+    rows.append(nav)
+    rows.append([InlineKeyboardButton("الأسهل", callback_data="gp:easy:1"),
+                 InlineKeyboardButton("Q1", callback_data="gp:q1:1"),
+                 InlineKeyboardButton("إيطاليا", callback_data="gp:italy:1"),
+                 InlineKeyboardButton("الكل", callback_data="gp:all:1")])
+    return "\n".join(lines), InlineKeyboardMarkup(rows)
+
+
+async def _send_gap_card(bot_, chat_id, gap_id: int):
+    from data.research_gaps import RESEARCH_GAPS, BROAD_QUERY
+    from gapcheck import check_topic, format_check, priority, count_recent
+    g = next((x for x in RESEARCH_GAPS if x["id"] == gap_id), None)
+    if not g:
+        await safe_send(bot_, chat_id, "رقم غير موجود. أرسل /gaps لرؤية القائمة.")
+        return
+    loop = asyncio.get_running_loop()
+    n = await loop.run_in_executor(None, count_recent, g["query"])
+    await safe_send(bot_, chat_id, _gap_card(g, priority(g, n), n), parse_mode="Markdown", disable_web_page_preview=True)
+    res = await loop.run_in_executor(None, check_topic, g["query"], BROAD_QUERY.get(g["id"]))
+    await safe_send(bot_, chat_id, format_check(res), disable_web_page_preview=True)
 
 
 @_guard
 async def cmd_gaps(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/gaps [صفحة|easy|nodata|italy] : القائمة. /gaps N : بطاقة + فحص حي. /gaprank : ترتيب حي بالأرقام."""
-    from data.research_gaps import RESEARCH_GAPS, AVOID_TOPICS, DIFFICULTY_ICON, CROWD_LABEL, BROAD_QUERY
-    from gapcheck import check_topic, format_check, priority, count_recent
-    from data.gap_tiers import tier_info
+    """/gaps [easy|nodata|italy|q1|weak|pN|رقم_فجوة] : قائمة بأزرار تنقل. /gaps N : بطاقة الفجوة + فحص حي."""
     chat_id = update.effective_chat.id
     arg = (context.args[0].lower() if context.args else "")
-    loop = asyncio.get_running_loop()
-    if arg.isdigit() and any(g["id"] == int(arg) for g in RESEARCH_GAPS):
-        g = next(x for x in RESEARCH_GAPS if x["id"] == int(arg))
-        n = await loop.run_in_executor(None, count_recent, g["query"])
-        await safe_send(context.bot, chat_id, _gap_card(g, priority(g, n), n), parse_mode="Markdown",
-                        disable_web_page_preview=True)
-        res = await loop.run_in_executor(None, check_topic, g["query"], BROAD_QUERY.get(g["id"]))
-        await safe_send(context.bot, chat_id, format_check(res), disable_web_page_preview=True)
+    if arg.isdigit():
+        await _send_gap_card(context.bot, chat_id, int(arg))
         return
-    items = sorted(RESEARCH_GAPS, key=lambda x: -priority(x))
-    title = "كل الفجوات مرتبة بدرجة الأولوية الأولية"
-    if arg == "easy":
-        items = [g for g in items if g["difficulty"] <= 2 and g["data"] in ("none", "public")]
-        title = "الأسهل (صعوبة ≤2 بلا مختبر)"
-    elif arg == "nodata":
-        items = [g for g in items if g["data"] == "none"]
-        title = "بلا أي بيانات حقلية"
-    elif arg == "q1":
-        items = [g for g in items if tier_info(g)["best"] == "Q1" and tier_info(g)["verdict"] != "weak"]
-        title = "قادرة على Q1 إن نُفِّذت بامتياز (بلا الضعيفة)"
-    elif arg == "weak":
-        items = [g for g in items if tier_info(g)["verdict"] == "weak"]
-        title = "الضعيفة/لا أنصح بها الآن"
-    elif arg == "italy":
-        items = [g for g in items if "إيطالي" in g["title"] or "متوسط" in g["title"] or "صقلية" in g["title"]]
-        title = "ذات صلة بإيطاليا/المتوسط"
     page = int(arg[1:]) if (arg.startswith("p") and arg[1:].isdigit()) else 1
-    pages = max(1, (len(items) + GAPS_PAGE - 1) // GAPS_PAGE)
-    page = min(max(page, 1), pages)
-    chunk = items[(page - 1) * GAPS_PAGE: page * GAPS_PAGE]
-    lines = [f"🧭 *{title}* ({len(items)} فجوة، صفحة {page}/{pages})\n_فرضيات تحتاج تحققاً، والدرجة للترتيب فقط_\n"]
-    for g in chunk:
-        lines.append(f"*{g['id']}.* {DIFFICULTY_ICON[g['difficulty']]} {g['title']}\n"
-                     f"   {tier_line(g)}\n"
-                     f"   أولوية {priority(g)} | صعوبة {g['difficulty']}/5 | {g['months']} شهراً | ازدحام {CROWD_LABEL[g['crowd']]}")
-    if page == pages:
-        lines.append("\n*تجنّب كمشروع رئيسي بلا بيانات حصرية:*")
-        lines += [f"• {t}" for t in AVOID_TOPICS]
-    lines.append("\nللتفاصيل والفحص الحي: `/gaps 5` (رقم الفجوة) | الصفحات: `/gaps p2`")
-    lines.append("فلاتر: `/gaps easy` `/gaps nodata` `/gaps italy` `/gaps q1` `/gaps weak` | ترتيب حي بالأرقام: `/gaprank` | "
-                 "فحص فكرتك: `/gapcheck ...` | خريطة الفراغات: `/gapmatrix`")
-    await safe_send(context.bot, chat_id, "\n".join(lines), parse_mode="Markdown", disable_web_page_preview=True)
+    key = arg if arg in GAP_FILTERS else "all"
+    text, kb = _gaps_view(key, page)
+    await safe_send(context.bot, chat_id, text, parse_mode="Markdown", reply_markup=kb, disable_web_page_preview=True)
+
+
+@_guard
+async def cmd_gaphelp(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await safe_send(context.bot, update.effective_chat.id, (
+        "📖 *معاني مصطلحات الفجوات*\n\n"
+        "*الصعوبة التقنية (1-5):* مقدار الجهد والمهارة اللازمين للتنفيذ. 1-2 يمكن لباحث واحد، 4-5 يحتاج مشرفاً خبيراً.\n\n"
+        "*الازدحام:* كم باحثاً ينشر في الزاوية نفسها. منخفض = قليل ينافسك (تأكد أنه ليس قليل الاهتمام)، "
+        "متوسط = تحتاج زاوية محددة، مرتفع = لا تبدأ إلا بميزة واضحة. يُصحَّح بقياس فعلي لعدد الأوراق إن توفر.\n\n"
+        "*نوع المساهمة:* ما الذي تضيفه للأدبيات: بيانات جديدة، طريقة جديدة، تركيب كمي، مقارنة معيارية، "
+        "نتيجة سلبية، برمجية، مراجعة، دراسة حالة، سياسات، ميتا-بحث.\n\n"
+        "*المستوى الواقعي (Q1/Q2/Q3):* أي مستوى مجلات تناسب هذه المساهمة عادة. الربع الدقيق خاص بكل مجلة في Scimago، "
+        "فتحقق منه للمجلة التي تختارها.\n\n"
+        "*صعوبة القبول (1-5):* مدى صعوبة اجتياز المراجعة: 1 سهل، 3 متوسط، 5 شبه مستحيل دون عناصر استثنائية.\n\n"
+        "*الحكم:* ✅ تستحق = ابدأ إن توفرت الشروط. ⚠️ مشروطة = تستحق إن تجنبت شرط الضعف المكتوب. ⛔ ضعيفة الآن = لا أنصح بها كمشروع رئيسي.\n\n"
+        "*درجة الأولوية (0-11):* سهولة (حتى 5) + بيانات (حتى 2) + قلة الازدحام (حتى 2) + ملاءمتك لملفك (حتى 2). "
+        "هي للترتيب فقط وليست توقعاً للقبول.\n\n"
+        "*الفجوات الجديدة (/newgaps):* جمل يكتبها مؤلفو أوراق حديثة عن نقص في موضوعهم. تُجمع يومياً آلياً، وليست مثبتة."),
+        parse_mode="Markdown")
+
+
+def _newgaps_view(idx: int):
+    from gapdiscovery import format_discovery
+    total = count_discovered_gaps()
+    if total == 0:
+        return None, None
+    idx = min(max(idx, 0), total - 1)
+    d = list_discovered_gaps(1, idx)[0]
+    nav = []
+    if idx > 0:
+        nav.append(InlineKeyboardButton("◀️ الأحدث", callback_data=f"gn:{idx - 1}"))
+    nav.append(InlineKeyboardButton(f"{idx + 1}/{total}", callback_data="noop"))
+    if idx < total - 1:
+        nav.append(InlineKeyboardButton("الأقدم ▶️", callback_data=f"gn:{idx + 1}"))
+    return format_discovery(d, idx + 1, total), InlineKeyboardMarkup([nav])
+
+
+async def _run_discovery(bot_, notify: bool):
+    """يجلب فجوات معلنة حديثة، يخزن الجديد، ويرسل أحدث 3 جديدة للمستخدمين إن طُلب."""
+    from gapdiscovery import discover, format_discovery
+    loop = asyncio.get_running_loop()
+    found = await loop.run_in_executor(None, discover)
+    added = await loop.run_in_executor(None, add_discovered_gaps, found)
+    logger.info(f"gap discovery stored {added} new of {len(found)}")
+    if notify and added:
+        fresh = await loop.run_in_executor(None, take_unnotified_gaps, 3)
+        for chat in list_recipient_ids():
+            await safe_send(bot_, chat, f"🆕 *{added} فجوة جديدة معلنة اليوم.* أحدث {len(fresh)}:",
+                            parse_mode="Markdown")
+            for d in fresh:
+                await safe_send(bot_, chat, format_discovery(d), disable_web_page_preview=True)
+            await safe_send(bot_, chat, "للتصفح الكامل بأزرار التنقل: /newgaps")
+    return added
+
+
+@_guard
+async def cmd_newgaps(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """فجوات جديدة معلنة من أوراق حديثة، تتجدد يومياً تلقائياً."""
+    chat_id = update.effective_chat.id
+    text, kb = _newgaps_view(0)
+    if text is None:
+        await safe_send(context.bot, chat_id, "⏳ لا فجوات مخزنة بعد. أجلبها الآن من الأوراق الحديثة (قد يستغرق دقيقة)...")
+        added = await _run_discovery(context.bot, notify=False)
+        text, kb = _newgaps_view(0)
+        if text is None:
+            await safe_send(context.bot, chat_id, "تعذّر الجلب الآن (غالباً حد طلبات OpenAlex). سيعاد المحاولة تلقائياً يومياً.")
+            return
+    await safe_send(context.bot, chat_id, text, parse_mode="Markdown", reply_markup=kb, disable_web_page_preview=True)
+
+
+async def gap_discovery_job(context: ContextTypes.DEFAULT_TYPE):
+    try:
+        await _run_discovery(context.bot, notify=True)
+    except Exception as e:
+        logger.warning(f"gap discovery job failed: {e}")
 
 
 @_guard
@@ -1060,6 +1210,8 @@ async def post_init(app):
         BotCommand("gaps", "فجوات بحثية مرشحة"),
         BotCommand("gapcheck", "افحص تشبّع فكرة بحثية"),
         BotCommand("gaprank", "ترتيب الفجوات بالأرقام"),
+        BotCommand("newgaps", "فجوات جديدة تتجدد يومياً"),
+        BotCommand("gaphelp", "معاني مصطلحات الفجوات"),
         BotCommand("gapmatrix", "خريطة فراغات الطرق×التطبيقات"),
         BotCommand("sources", "مواقعي المراقَبة"),
         BotCommand("help", "المساعدة"),
@@ -1092,6 +1244,8 @@ def main():
     app.add_handler(CommandHandler("gaps", cmd_gaps))
     app.add_handler(CommandHandler("gapcheck", cmd_gapcheck))
     app.add_handler(CommandHandler("gaprank", cmd_gaprank))
+    app.add_handler(CommandHandler("newgaps", cmd_newgaps))
+    app.add_handler(CommandHandler("gaphelp", cmd_gaphelp))
     app.add_handler(CommandHandler("gapmatrix", cmd_gapmatrix))
     app.add_handler(CommandHandler("sources", cmd_sources))
     app.add_handler(CommandHandler("delsource", cmd_delsource))
@@ -1111,6 +1265,8 @@ def main():
             n = await asyncio.get_running_loop().run_in_executor(None, warm_cache, RESEARCH_GAPS)
             logger.info(f"gap cache warmed: {n} new counts")
         job_queue.run_repeating(_warm_gap_cache, interval=24 * 3600, first=120)
+        job_queue.run_once(gap_discovery_job, when=240)  # أول جلب بعد الإقلاع بدقائق
+        job_queue.run_daily(gap_discovery_job, time=time(hour=8, minute=30), days=(0, 1, 2, 3, 4, 5, 6))
         job_queue.run_daily(
             daily_alert_job,
             time=time(hour=DAILY_REPORT_HOUR, minute=DAILY_REPORT_MINUTE),
