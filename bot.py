@@ -78,6 +78,7 @@ from database import (
 )
 from hunter import execute_deep_hunt, HUNTING_TARGETS
 from data.professors import TOP_PROFESSORS_RADAR
+from data.gap_tiers import tier_block, tier_line
 from email_advisor import generate_bilal_cold_email
 from notifier import (
     format_opportunity_card,
@@ -915,6 +916,7 @@ def _gap_card(g: dict, score=None, n_recent=None) -> str:
         f"🤖 دور Claude: {g['claude']}\n"
         f"📰 أنواع المجلات: {g['venues']}"
         f"{live}{sc}\n\n"
+        f"{tier_block(g, n_recent)}\n\n"
         "⚠️ هذه فرضية فجوة من معرفتي، وليست مثبتة. الفحص الآلي أدناه يساعد ولا يغني عن قراءة الأوراق."
     )
 
@@ -927,6 +929,7 @@ async def cmd_gaps(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """/gaps [صفحة|easy|nodata|italy] : القائمة. /gaps N : بطاقة + فحص حي. /gaprank : ترتيب حي بالأرقام."""
     from data.research_gaps import RESEARCH_GAPS, AVOID_TOPICS, DIFFICULTY_ICON, CROWD_LABEL, BROAD_QUERY
     from gapcheck import check_topic, format_check, priority, count_recent
+    from data.gap_tiers import tier_info
     chat_id = update.effective_chat.id
     arg = (context.args[0].lower() if context.args else "")
     loop = asyncio.get_running_loop()
@@ -946,6 +949,12 @@ async def cmd_gaps(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif arg == "nodata":
         items = [g for g in items if g["data"] == "none"]
         title = "بلا أي بيانات حقلية"
+    elif arg == "q1":
+        items = [g for g in items if tier_info(g)["best"] == "Q1" and tier_info(g)["verdict"] != "weak"]
+        title = "قادرة على Q1 إن نُفِّذت بامتياز (بلا الضعيفة)"
+    elif arg == "weak":
+        items = [g for g in items if tier_info(g)["verdict"] == "weak"]
+        title = "الضعيفة/لا أنصح بها الآن"
     elif arg == "italy":
         items = [g for g in items if "إيطالي" in g["title"] or "متوسط" in g["title"] or "صقلية" in g["title"]]
         title = "ذات صلة بإيطاليا/المتوسط"
@@ -956,12 +965,13 @@ async def cmd_gaps(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lines = [f"🧭 *{title}* ({len(items)} فجوة، صفحة {page}/{pages})\n_فرضيات تحتاج تحققاً، والدرجة للترتيب فقط_\n"]
     for g in chunk:
         lines.append(f"*{g['id']}.* {DIFFICULTY_ICON[g['difficulty']]} {g['title']}\n"
+                     f"   {tier_line(g)}\n"
                      f"   أولوية {priority(g)} | صعوبة {g['difficulty']}/5 | {g['months']} شهراً | ازدحام {CROWD_LABEL[g['crowd']]}")
     if page == pages:
         lines.append("\n*تجنّب كمشروع رئيسي بلا بيانات حصرية:*")
         lines += [f"• {t}" for t in AVOID_TOPICS]
     lines.append("\nللتفاصيل والفحص الحي: `/gaps 5` (رقم الفجوة) | الصفحات: `/gaps p2`")
-    lines.append("فلاتر: `/gaps easy` `/gaps nodata` `/gaps italy` | ترتيب حي بالأرقام: `/gaprank` | "
+    lines.append("فلاتر: `/gaps easy` `/gaps nodata` `/gaps italy` `/gaps q1` `/gaps weak` | ترتيب حي بالأرقام: `/gaprank` | "
                  "فحص فكرتك: `/gapcheck ...` | خريطة الفراغات: `/gapmatrix`")
     await safe_send(context.bot, chat_id, "\n".join(lines), parse_mode="Markdown", disable_web_page_preview=True)
 
@@ -971,6 +981,7 @@ async def cmd_gaprank(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """ترتيب حي لكل الفجوات بالعدد الفعلي للأوراق المطابقة (OpenAlex)."""
     from data.research_gaps import RESEARCH_GAPS
     from gapcheck import rank_gaps
+    from data.gap_tiers import tier_info
     chat_id = update.effective_chat.id
     await safe_send(context.bot, chat_id, "⏳ أقيس الأدبيات لكل فجوة (قد يستغرق دقيقة)...")
     loop = asyncio.get_running_loop()
@@ -978,7 +989,8 @@ async def cmd_gaprank(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lines = ["🏁 *ترتيب حي للفجوات* (سهولة + بيانات + ازدحام فعلي + ملاءمتك؛ الحد الأقصى ≈ 11)\n"]
     for g in ranked[:15]:
         n = "؟" if g["n_recent"] is None else g["n_recent"]
-        lines.append(f"*{g['id']}.* {g['score']} | أوراق مطابقة: {n} | {g['title'][:60]}")
+        ti = tier_info(g, g["n_recent"])
+        lines.append(f"*{g['id']}.* {g['score']} | {ti['verdict_label']} {ti['likely']} | أوراق: {n} | {g['title'][:55]}")
     lines.append("\n⚠️ استعلامات ضيقة قد تعطي أعداداً صغيرة لأن الصياغة تختلف؛ العدد الصغير لا يثبت الفجوة. "
                  "افتح `/gaps N` وقرأ الأوراق القريبة قبل أي التزام. `؟` = تعذر القياس.")
     await safe_send(context.bot, chat_id, "\n".join(lines), parse_mode="Markdown", disable_web_page_preview=True)
@@ -1080,6 +1092,14 @@ def main():
     if job_queue:
         from datetime import time
         job_queue.run_once(initial_hunt_job, when=5)  # لا نحجب الإقلاع بالصيد
+
+        async def _warm_gap_cache(context):
+            """تدفئة بطيئة لأعداد OpenAlex كل يوم: تجعل /gaprank فورياً بلا مفتاح API."""
+            from data.research_gaps import RESEARCH_GAPS
+            from gapcheck import warm_cache
+            n = await asyncio.get_running_loop().run_in_executor(None, warm_cache, RESEARCH_GAPS)
+            logger.info(f"gap cache warmed: {n} new counts")
+        job_queue.run_repeating(_warm_gap_cache, interval=24 * 3600, first=120)
         job_queue.run_daily(
             daily_alert_job,
             time=time(hour=DAILY_REPORT_HOUR, minute=DAILY_REPORT_MINUTE),

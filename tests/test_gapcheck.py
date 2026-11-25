@@ -47,3 +47,15 @@ def test_matrix_formatting_handles_missing():
     m = [("A", "x")]; a = [("B", "y"), ("C", "z")]
     out = format_matrix(m, a, {("A", "B"): 2, ("A", "C"): None})
     assert "?" in out and "A × B (2)" in out
+
+
+def test_every_gap_has_tier_and_live_downgrade():
+    from data.gap_tiers import TIERS, tier_info, tier_block
+    for g in RESEARCH_GAPS:
+        assert g["id"] in TIERS
+        t = TIERS[g["id"]]
+        assert t["best"] in ("Q1", "Q2", "Q3") and 1 <= t["risk"] <= 5 and t["verdict"] in ("go", "cond", "weak")
+    g = next(x for x in RESEARCH_GAPS if x["id"] == 1)
+    base, crowded = tier_info(g), tier_info(g, 500)
+    assert crowded["risk"] == base["risk"] + 1 and crowded["verdict"] != "go" and crowded["notes"]
+    assert "Scimago" in tier_block(g)

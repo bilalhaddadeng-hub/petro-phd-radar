@@ -142,23 +142,64 @@ def format_check(res: Dict) -> str:
 # ------------------------------ تقييم موضوعي بالأرقام ------------------------------
 import concurrent.futures
 
+import json
+from pathlib import Path
+
+CACHE_TTL = 7 * 24 * 3600  # الأعداد تتغير ببطء: أسبوع كافٍ ويخفف الحمل عن الميزانية المجانية
+CACHE_FILE = Path(os.environ.get("GAP_CACHE_FILE") or (Path(os.environ.get("DB_PATH", "phd_radar.db")).parent / "gap_cache.json"))
 _CACHE: Dict[str, tuple] = {}
-CACHE_TTL = 24 * 3600
 
 
-def count_recent(q: str, years: int = 3) -> Optional[int]:
-    """عدد أوراق title+abstract المطابقة منذ N سنوات (مخزَّن مؤقتاً يوماً لتخفيف الحمل على OpenAlex)."""
+def _load_cache():
+    try:
+        raw = json.loads(CACHE_FILE.read_text(encoding="utf-8"))
+        _CACHE.update({k: (float(v[0]), v[1]) for k, v in raw.items()})
+    except (OSError, ValueError, TypeError, IndexError):
+        pass
+
+
+def _save_cache():
+    try:
+        CACHE_FILE.write_text(json.dumps({k: list(v) for k, v in _CACHE.items()}), encoding="utf-8")
+    except OSError as e:
+        logger.debug(f"gap cache not saved: {e}")
+
+
+_load_cache()
+
+
+def count_recent(q: str, years: int = 3, cached_only: bool = False) -> Optional[int]:
+    """عدد أوراق title+abstract المطابقة منذ N سنوات، مخزَّن على القرص أسبوعاً (يعمل بلا مفتاح)."""
     q = clean_query(q)
     key = f"{years}|{q}"
     hit = _CACHE.get(key)
     if hit and time.time() - hit[0] < CACHE_TTL:
         return hit[1]
+    if cached_only:
+        return hit[1] if hit else None  # قديم أفضل من لا شيء حين لا نريد استعلاماً
     since = f"{date.today().year - years}-01-01"
     d = _get({"filter": f"title_and_abstract.search:{q},from_publication_date:{since}", "per-page": 1})
     n = (d or {}).get("meta", {}).get("count")
     if n is not None:
         _CACHE[key] = (time.time(), n)
+        _save_cache()
+    elif hit:
+        return hit[1]
     return n
+
+
+def warm_cache(gaps: List[Dict], budget_s: float = 600.0) -> int:
+    """مهمة خلفية بطيئة تملأ الذاكرة المؤقتة لكل الفجوات، فيصبح /gaprank فورياً دون مفتاح."""
+    t0, done = time.time(), 0
+    for g in gaps:
+        if time.time() - t0 > budget_s:
+            break
+        before = _CACHE.get(f"3|{clean_query(g['query'])}")
+        if before and time.time() - before[0] < CACHE_TTL:
+            continue
+        if count_recent(g["query"]) is not None:
+            done += 1
+    return done
 
 
 DATA_PTS = {"none": 2.0, "public": 1.5, "partner": -1.0, "lab": -2.0}
@@ -190,12 +231,12 @@ def priority(g: Dict, n_recent: Optional[int] = None) -> float:
 
 
 def rank_gaps(gaps: List[Dict], live: bool = True) -> List[Dict]:
-    """يعيد الفجوات مرتبة مع الدرجة والعدد الحي إن أمكن."""
+    """يرتّب الفجوات. يعتمد على الذاكرة المؤقتة أولاً؛ ويجلب الناقص ضمن ميزانية وقت 40 ثانية فقط."""
     counts: Dict[int, Optional[int]] = {g["id"]: None for g in gaps}
     if live:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
-            for g, n in zip(gaps, ex.map(lambda g: count_recent(g["query"]), gaps)):
-                counts[g["id"]] = n
+        t0 = time.time()
+        for g in gaps:
+            counts[g["id"]] = count_recent(g["query"], cached_only=(time.time() - t0 > 40))
     out = [{**g, "n_recent": counts[g["id"]], "score": priority(g, counts[g["id"]])} for g in gaps]
     return sorted(out, key=lambda x: -x["score"])
 
