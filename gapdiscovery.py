@@ -24,7 +24,7 @@ DISCOVERY_TOPICS = [
     ("الحرارة الجوفية والآبار", '"geothermal" AND ("reservoir" OR "wells")', "geothermal reservoir wells", ["geothermal"]),
     ("الهيدروجين الطبيعي", '("natural hydrogen" OR "geologic hydrogen" OR "white hydrogen")', "natural geologic hydrogen", ["hydrogen"]),
     ("محاكاة المكامن ومطابقة التاريخ", '("reservoir simulation" OR "history matching")', "reservoir simulation history matching", ["reservoir"]),
-    ("الاسترداد المعزز EOR", '("enhanced oil recovery" OR "EOR")', "enhanced oil recovery", ["recovery", "eor"]),
+    ("الاسترداد المعزز EOR", '("enhanced oil recovery" OR "EOR")', "enhanced oil recovery", ["oil recovery", "oil reservoir", "petroleum", "crude oil", "waterflood", "polymer flood", "surfactant"]),
     ("التدفق متعدد الأطوار في الأوساط المسامية", '"multiphase flow" AND "porous media"', "multiphase flow porous media", ["porous"]),
     ("تعلم آلي للمكامن", '("machine learning" OR "deep learning") AND ("reservoir" OR "petroleum")', "machine learning reservoir petroleum", ["reservoir", "petroleum"]),
 ]
@@ -40,6 +40,18 @@ _TRIGGER_RE = re.compile(
     r"|understudied|underexplored|little is known|has not been|have not been)", re.I)
 # جمل تصف ما تفعله الورقة (منهج) وليست فجوة: تُستبعد
 _METHOD_START = re.compile(r"^(this (study|work|paper|research)|in this|here,? we|we (propose|present|develop|investigate)|the present)\b", re.I)
+# ضجيج من مجالات أخرى (EOR = نسبة الإستراديول في الطب، reservoir computing، إلخ)
+NOISE = ["patient", "clinical", "ivf", "oocyte", "embryo", "cancer", "tumor", "tumour", "hiv", "disease", "therapy",
+         "surgery", "diagnos", "mice", "protein", "reservoir computing", "quantum reservoir", "viral reservoir"]
+
+
+def is_relevant(title: str, abstract: str, keywords) -> bool:
+    hay = f"{title} {abstract}".lower()
+    if any(n in hay for n in NOISE):
+        return False
+    return not keywords or any(k in hay for k in keywords)
+
+
 _SENT_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z])")
 
 
@@ -62,11 +74,14 @@ def extract_gap_sentence(abstract: str) -> Optional[str]:
     return None
 
 
-def parse_discoveries(data: Optional[Dict], topic_label: str) -> List[Dict]:
+def parse_discoveries(data: Optional[Dict], topic_label: str, keywords=None) -> List[Dict]:
     out = []
     for w in (data or {}).get("results", []):
-        sent = extract_gap_sentence(rebuild_abstract(w.get("abstract_inverted_index")))
+        abstract = rebuild_abstract(w.get("abstract_inverted_index"))
+        sent = extract_gap_sentence(abstract)
         title = (w.get("title") or "").strip()
+        if not is_relevant(title, abstract, keywords):
+            continue
         key = w.get("doi") or w.get("id")
         if not (sent and title and key):
             continue
@@ -90,8 +105,7 @@ def parse_crossref(data: Optional[Dict], topic_label: str, keywords) -> List[Dic
         abstract = _clean_jats(it.get("abstract", ""))
         if not (title and abstract):
             continue
-        hay = f"{title} {abstract}".lower()
-        if keywords and not any(k in hay for k in keywords):
+        if not is_relevant(title, abstract, keywords):
             continue
         sent = extract_gap_sentence(abstract)
         if not sent:
@@ -135,7 +149,7 @@ def discover(days: int = 150, per_topic: int = 25, topics=DISCOVERY_TOPICS) -> L
             if data is None:
                 use_crossref = True  # لا نهدر الوقت: OpenAlex محدود الآن، نكمل بالبديل لكل المواضيع
         if data is not None:
-            found += parse_discoveries(data, label)
+            found += parse_discoveries(data, label, kws)
             continue
         cr = _crossref_fetch(simple_q, since, rows=60)
         if cr is None:

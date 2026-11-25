@@ -40,3 +40,10 @@ def test_parse_crossref_filters_by_keyword_and_strips_jats():
         {"DOI": "10.1/b", "title": ["Other"], "abstract": "<jats:p>Cancer treatment remains poorly understood in many contexts today.</jats:p>"}]}}
     out = parse_crossref(data, "t", ["hydrogen"])
     assert len(out) == 1 and out[0]["key"].endswith("10.1/a") and out[0]["date"] == "2026-10-09"
+
+
+def test_noise_filter_drops_medical_eor():
+    from gapdiscovery import is_relevant
+    assert not is_relevant("Estradiol ratio", "EOR in IVF patients remains unclear", ["oil recovery"])
+    assert is_relevant("Polymer flooding", "enhanced oil recovery in sandstone", ["oil recovery"])
+    assert not is_relevant("Reservoir computing", "reservoir computing hardware", ["reservoir"])

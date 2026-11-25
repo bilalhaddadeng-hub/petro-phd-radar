@@ -79,7 +79,8 @@ from database import (
     list_discovered_gaps,
     count_discovered_gaps,
     take_unnotified_gaps,
-    list_recipient_ids
+    list_recipient_ids,
+    purge_gap_noise
 )
 from hunter import execute_deep_hunt, HUNTING_TARGETS
 from data.professors import TOP_PROFESSORS_RADAR
@@ -1099,8 +1100,9 @@ def _newgaps_view(idx: int):
 
 async def _run_discovery(bot_, notify: bool):
     """يجلب فجوات معلنة حديثة، يخزن الجديد، ويرسل أحدث 3 جديدة للمستخدمين إن طُلب."""
-    from gapdiscovery import discover, format_discovery
+    from gapdiscovery import discover, format_discovery, NOISE
     loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, purge_gap_noise, NOISE)  # تنظيف ما خُزّن قبل تحسين الفلتر
     found = await loop.run_in_executor(None, discover)
     added = await loop.run_in_executor(None, add_discovered_gaps, found)
     logger.info(f"gap discovery stored {added} new of {len(found)}")
@@ -1119,6 +1121,8 @@ async def _run_discovery(bot_, notify: bool):
 async def cmd_newgaps(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """فجوات جديدة معلنة من أوراق حديثة، تتجدد يومياً تلقائياً."""
     chat_id = update.effective_chat.id
+    from gapdiscovery import NOISE
+    await asyncio.get_running_loop().run_in_executor(None, purge_gap_noise, NOISE)
     text, kb = _newgaps_view(0)
     if text is None:
         await safe_send(context.bot, chat_id, "⏳ لا فجوات مخزنة بعد. أجلبها الآن من الأوراق الحديثة (قد يستغرق دقيقة)...")

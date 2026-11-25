@@ -712,3 +712,18 @@ def list_recipient_ids() -> List[str]:
     finally:
         conn.close()
     return sorted(ids | {str(x) for x in OWNER_CHAT_IDS})
+
+
+def purge_gap_noise(terms) -> int:
+    """يحذف فجوات مخزنة سابقاً تحوي مصطلحات من مجالات أخرى (بعد تحسين الفلتر)."""
+    init_gap_tables()
+    conn = get_connection()
+    try:
+        n = 0
+        for t in terms:
+            n += conn.execute("DELETE FROM discovered_gaps WHERE lower(title || ' ' || sentence) LIKE ?",
+                              (f"%{t.lower()}%",)).rowcount
+        conn.commit()
+        return n
+    finally:
+        conn.close()
